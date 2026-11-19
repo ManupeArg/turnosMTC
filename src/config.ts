@@ -26,8 +26,15 @@ export const DIAS_RESERVA = 365;
 /** Hasta cuántos días hábiles hacia adelante puede elegir el consultorio al cargar o mover un turno. */
 export const DIAS_AGENDA = 130;
 
-/** Duración de cada turno, en minutos. */
-export const DURACION_MIN = 30;
+/** La agenda se divide en bloques de 15 minutos. */
+export const PASO_MIN = 15;
+
+/** Duración del turno según el tipo de paciente, en minutos.
+ *  Si cambiás estos valores, cambiá también la función reservar_turno de supabase/schema.sql. */
+export const DURACION_PRIMERA_VEZ = 30;
+export const DURACION_HABITUAL = 15;
+
+export const duracionDe = (primeraVez: boolean) => (primeraVez ? DURACION_PRIMERA_VEZ : DURACION_HABITUAL);
 
 /** Franjas de atención por día de la semana (0 = domingo). Cada franja es [desde, hasta) en horas. */
 export const ATENCION: Record<number, [number, number][]> = {

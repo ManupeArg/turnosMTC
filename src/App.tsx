@@ -5,7 +5,8 @@ import { Modal } from './components/Modal';
 import { TurnoModal } from './components/TurnoModal';
 import { DIAS_AGENDA, MARCA } from './config';
 import * as api from './lib/datos';
-import { avisoDe, diaLargo, horaLinda, horasAntes, proximosDiasHabiles } from './lib/fechas';
+import { avisosDe } from './lib/avisos';
+import { diaLargo, horaLinda, proximosDiasHabiles } from './lib/fechas';
 import { Calendario } from './screens/Calendario';
 import { General } from './screens/General';
 import { Login } from './screens/Login';
@@ -83,14 +84,12 @@ export default function App() {
 
   const turno = datos?.turnos.find((t) => t.id === turnoId) ?? null;
   const pacienteDelTurno = turno ? datos?.pacientes.find((p) => p.id === turno.paciente_id) ?? null : null;
-  /** Qué avisos por WhatsApp llegan a salir para un turno que se carga ahora. */
+  /** Qué recordatorios por WhatsApp llegan a salir para un turno que se carga ahora. */
   const textoAvisos = (fecha: string, hora: string) => {
     if (!datos) return '';
-    const ahora = new Date().toISOString();
-    const horas = [datos.config.recordatorio_horas_antes, datos.config.recordatorio2_horas_antes]
-      .filter((h): h is number => h != null && avisoDe(fecha, hora, h, ahora).seEnvia);
-    if (horas.length === 0) return ' Se reservó con poca anticipación: no sale ningún aviso por WhatsApp.';
-    return ` Aviso por WhatsApp: ${horas.map(horasAntes).join(' y ')}.`;
+    const salen = avisosDe({ fecha, hora, estado: 'pendiente', created_at: new Date().toISOString() }, datos.turnos, datos.config).filter((a) => a.seEnvia);
+    if (salen.length === 0) return ' Se reservó con poca anticipación: no sale ningún recordatorio por WhatsApp.';
+    return ` Recordatorio por WhatsApp: ${salen.map((a) => a.cuando).join(' y ')}.`;
   };
   const nombreDe = (id: string) => {
     const p = datos?.pacientes.find((x) => x.id === id);
@@ -143,11 +142,11 @@ export default function App() {
           />
         ) : (
           <NuevoPaciente
-            turnos={datos.turnos} bloqueos={datos.bloqueos} dias={diasElegibles} config={datos.config}
+            turnos={datos.turnos} bloqueos={datos.bloqueos} dias={diasElegibles}
             onGuardar={async (nuevo, t) => {
               const ok = await ejecutar(async () => {
                 const p = await api.guardarPaciente(nuevo);
-                if (t) await api.crearTurno({ paciente_id: p.id, ...t });
+                if (t) await api.crearTurno({ paciente_id: p.id, ...t, primera_vez: true });
               }, t
                 ? `${nuevo.nombre} ${nuevo.apellido} quedó guardado, con turno el ${diaLargo(t.fecha)} a las ${horaLinda(t.hora)}.${textoAvisos(t.fecha, t.hora)}`
                 : `${nuevo.nombre} ${nuevo.apellido} quedó guardado.`);
@@ -175,8 +174,8 @@ export default function App() {
       {datos && agregar && (
         <AgregarTurnoModal
           pacientes={datos.pacientes} turnos={datos.turnos} bloqueos={datos.bloqueos} dias={diasElegibles} inicial={agregar}
-          onGuardar={async (pacienteId, fecha, hora) => {
-            const ok = await ejecutar(() => api.crearTurno({ paciente_id: pacienteId, fecha, hora }),
+          onGuardar={async (pacienteId, fecha, hora, primeraVez) => {
+            const ok = await ejecutar(() => api.crearTurno({ paciente_id: pacienteId, fecha, hora, primera_vez: primeraVez }),
               `Turno guardado: ${nombreDe(pacienteId)}, ${diaLargo(fecha)} a las ${horaLinda(hora)}.${textoAvisos(fecha, hora)}`);
             if (ok) setAgregar(null);
           }}

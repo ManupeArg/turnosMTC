@@ -2,32 +2,34 @@
 // sin configurar, guarda todo en el navegador (modo demo) para poder probar la app al toque.
 import type { Bloqueo, Config, Datos, DatosPaciente, NoDisponible, Paciente, Turno } from '../types';
 import { PACIENTES_EJEMPLO, turnosEjemplo } from './ejemplos';
-import { DIAS_RESERVA } from '../config';
-import { ocupaLugar } from './disponibilidad';
-import { hoyIso, slotsDe, sumarDias, yaPaso } from './fechas';
+import { DIAS_RESERVA, duracionDe, PASO_MIN } from '../config';
+import { AVISO1_PREDETERMINADO, AVISO2_PREDETERMINADO } from './avisos';
+import { cabe, crearOcupado, ocupaLugar } from './disponibilidad';
+import { hoyIso, sumarDias, yaPaso } from './fechas';
 import { supabase } from './supabase';
 
 export const MODO_DEMO = !supabase;
 
-const CONFIG_INICIAL: Config = { recordatorio_horas_antes: 24, recordatorio2_horas_antes: 2 };
+const CONFIG_INICIAL: Config = { aviso1: AVISO1_PREDETERMINADO, aviso2: AVISO2_PREDETERMINADO };
 const HORARIO_OCUPADO = 'Ese horario ya está ocupado. Elegí otro.';
 
 const fallar = (error: { message: string; code?: string } | null) => {
   if (!error) return;
-  if (error.code === '23505') throw new Error(HORARIO_OCUPADO);
+  // 23505: horario duplicado · 23P01: se superpone con otro turno
+  if (error.code === '23505' || error.code === '23P01') throw new Error(HORARIO_OCUPADO);
   throw new Error(error.message);
 };
 
 // ---------- Modo demo (localStorage) ----------
 
-const CLAVE = 'turnos-demo-v4';
+const CLAVE = 'turnos-demo-v5';
 const CLAVE_SESION = 'turnos-demo-sesion';
 const nuevoId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
 
 const armarEjemplos = (): Datos => {
-  const pacientes: Paciente[] = PACIENTES_EJEMPLO.map((p) => ({ ...p, id: nuevoId() }));
+  const pacientes: Paciente[] = PACIENTES_EJEMPLO.map((p, i) => ({ ...p, id: nuevoId(), created_at: new Date(Date.now() - (30 - i * 3) * 86400000).toISOString() }));
   const turnos: Turno[] = turnosEjemplo().map((t) => ({
-    id: nuevoId(), paciente_id: pacientes[t.indicePaciente].id, fecha: t.fecha, hora: t.hora, estado: t.estado, origen: t.origen, primera_vez: t.primera_vez,
+    id: nuevoId(), paciente_id: pacientes[t.indicePaciente].id, fecha: t.fecha, hora: t.hora, estado: t.estado, duracion: t.duracion, origen: t.origen, primera_vez: t.primera_vez,
     created_at: new Date(Date.now() - 7 * 86400000).toISOString(),
   }));
   return { pacientes, turnos, bloqueos: [], config: { ...CONFIG_INICIAL } };
@@ -92,10 +94,10 @@ export async function salir(): Promise<void> {
 export async function cargarTodo(): Promise<Datos> {
   if (!supabase) return leerLocal();
   const [pacientes, turnos, bloqueos, config] = await Promise.all([
-    supabase.from('pacientes').select('id,nombre,apellido,whatsapp,email,ciudad,edad,sexo,como_nos_conocio').order('apellido'),
-    supabase.from('turnos').select('id,paciente_id,fecha,hora,estado,origen,primera_vez,created_at').gte('fecha', hoyIso()).order('fecha').order('hora'),
+    supabase.from('pacientes').select('id,nombre,apellido,whatsapp,email,ciudad,edad,sexo,como_nos_conocio,created_at').order('apellido'),
+    supabase.from('turnos').select('id,paciente_id,fecha,hora,estado,duracion,origen,primera_vez,created_at').gte('fecha', hoyIso()).order('fecha').order('hora'),
     supabase.from('bloqueos').select('id,fecha,hora').gte('fecha', hoyIso()).order('fecha'),
-    supabase.from('configuracion').select('recordatorio_horas_antes,recordatorio2_horas_antes').eq('id', 1).maybeSingle(),
+    supabase.from('configuracion').select('aviso1,aviso2').eq('id', 1).maybeSingle(),
   ]);
   if (turnos.error?.code === '42703' || pacientes.error?.code === '42703' || config.error?.code === '42703' || bloqueos.error?.code === '42P01' || bloqueos.error?.code === 'PGRST205') {
     throw new Error('La base de datos está desactualizada: ejecutá de nuevo supabase/schema.sql en el SQL Editor de Supabase.');
@@ -117,7 +119,8 @@ export async function cargarTodo(): Promise<Datos> {
 export async function guardarPaciente(datos: DatosPaciente, id?: string): Promise<Paciente> {
   if (!supabase) {
     const todo = leerLocal();
-    const paciente: Paciente = { ...datos, id: id ?? nuevoId() };
+    const previo = id ? todo.pacientes.find((p) => p.id === id) : undefined;
+    const paciente: Paciente = { ...datos, id: id ?? nuevoId(), created_at: previo?.created_at ?? new Date().toISOString() };
     todo.pacientes = id ? todo.pacientes.map((p) => (p.id === id ? paciente : p)) : [...todo.pacientes, paciente];
     guardarLocal(todo);
     return paciente;
@@ -132,25 +135,27 @@ export async function guardarPaciente(datos: DatosPaciente, id?: string): Promis
 
 // ---------- Turnos ----------
 
-export async function crearTurno(turno: { paciente_id: string; fecha: string; hora: string }): Promise<void> {
+export async function crearTurno(turno: { paciente_id: string; fecha: string; hora: string; primera_vez: boolean }): Promise<void> {
+  const duracion = duracionDe(turno.primera_vez);
   if (!supabase) {
     const todo = leerLocal();
-    if (todo.turnos.some((t) => ocupaLugar(t) && t.fecha === turno.fecha && t.hora === turno.hora)) throw new Error(HORARIO_OCUPADO);
-    todo.turnos.push({ ...turno, id: nuevoId(), estado: 'pendiente', origen: 'consultorio', primera_vez: false, created_at: new Date().toISOString() });
+    if (!cabe(crearOcupado(todo.turnos, todo.bloqueos), turno.fecha, turno.hora, duracion)) throw new Error(HORARIO_OCUPADO);
+    todo.turnos.push({ ...turno, duracion, id: nuevoId(), estado: 'pendiente', origen: 'consultorio', created_at: new Date().toISOString() });
     guardarLocal(todo);
     return;
   }
-  const { error } = await supabase.from('turnos').insert({ ...turno, estado: 'pendiente' });
+  const { error } = await supabase.from('turnos').insert({ ...turno, duracion, estado: 'pendiente' });
   fallar(error);
 }
 
-export async function actualizarTurno(id: string, cambios: Partial<Pick<Turno, 'fecha' | 'hora' | 'estado'>>): Promise<void> {
+export async function actualizarTurno(id: string, cambios: Partial<Pick<Turno, 'fecha' | 'hora' | 'estado' | 'duracion'>>): Promise<void> {
   if (!supabase) {
     const todo = leerLocal();
     const actual = todo.turnos.find((t) => t.id === id);
     if (!actual) return;
     const nuevo = { ...actual, ...cambios };
-    if (ocupaLugar(nuevo) && todo.turnos.some((t) => t.id !== id && ocupaLugar(t) && t.fecha === nuevo.fecha && t.hora === nuevo.hora)) throw new Error(HORARIO_OCUPADO);
+    // Los bloqueos no impiden mover o confirmar un turno que ya existía: solo importa no pisar otro turno.
+    if (ocupaLugar(nuevo) && !cabe(crearOcupado(todo.turnos, [], { exceptoId: id }), nuevo.fecha, nuevo.hora, nuevo.duracion)) throw new Error(HORARIO_OCUPADO);
     todo.turnos = todo.turnos.map((t) => (t.id === id ? nuevo : t));
     guardarLocal(todo);
     return;
@@ -203,8 +208,8 @@ export async function horariosNoDisponibles(desde: string, hasta: string): Promi
     const todo = leerLocal();
     const enRango = (f: string) => f >= desde && f <= hasta;
     return [
-      ...todo.turnos.filter((t) => ocupaLugar(t) && enRango(t.fecha)).map((t) => ({ fecha: t.fecha, hora: t.hora })),
-      ...todo.bloqueos.filter((b) => enRango(b.fecha)).map((b) => ({ fecha: b.fecha, hora: b.hora })),
+      ...todo.turnos.filter((t) => ocupaLugar(t) && enRango(t.fecha)).map((t) => ({ fecha: t.fecha, hora: t.hora, duracion: t.duracion })),
+      ...todo.bloqueos.filter((b) => enRango(b.fecha)).map((b) => ({ fecha: b.fecha, hora: b.hora, duracion: PASO_MIN })),
     ];
   }
   const { data, error } = await supabase.rpc('horarios_no_disponibles', { desde, hasta });
@@ -226,17 +231,17 @@ const ultimosDigitos = (telefono: string) => telefono.replace(/\D/g, '').slice(-
 export async function reservarTurno(p: PedidoReserva): Promise<ResultadoReserva> {
   if (!supabase) {
     const todo = leerLocal();
-    if (!slotsDe(p.fecha).includes(p.hora) || yaPaso(p.fecha, p.hora) || p.fecha > sumarDias(hoyIso(), DIAS_RESERVA)) return 'invalido';
-    if (todo.turnos.some((t) => ocupaLugar(t) && t.fecha === p.fecha && t.hora === p.hora)) return 'ocupado';
-    if (todo.bloqueos.some((b) => b.fecha === p.fecha && (b.hora === null || b.hora === p.hora))) return 'ocupado';
+    const duracion = duracionDe(p.primera_vez);
+    if (!cabe(() => false, p.fecha, p.hora, duracion) || yaPaso(p.fecha, p.hora) || p.fecha > sumarDias(hoyIso(), DIAS_RESERVA)) return 'invalido';
+    if (!cabe(crearOcupado(todo.turnos, todo.bloqueos), p.fecha, p.hora, duracion)) return 'ocupado';
     let paciente = todo.pacientes.find((x) => ultimosDigitos(x.whatsapp) === ultimosDigitos(p.whatsapp));
     if (!paciente) {
-      paciente = { id: nuevoId(), nombre: p.nombre, apellido: p.apellido, whatsapp: p.whatsapp, email: p.email, ciudad: p.ciudad, edad: p.edad, sexo: p.sexo, como_nos_conocio: p.como_nos_conocio };
+      paciente = { id: nuevoId(), nombre: p.nombre, apellido: p.apellido, whatsapp: p.whatsapp, email: p.email, ciudad: p.ciudad, edad: p.edad, sexo: p.sexo, como_nos_conocio: p.como_nos_conocio, created_at: new Date().toISOString() };
       todo.pacientes.push(paciente);
     } else if (todo.turnos.filter((t) => ocupaLugar(t) && t.paciente_id === paciente!.id && t.fecha >= hoyIso()).length >= 2) {
       return 'limite';
     }
-    todo.turnos.push({ id: nuevoId(), paciente_id: paciente.id, fecha: p.fecha, hora: p.hora, estado: 'pendiente', origen: 'link', primera_vez: p.primera_vez, created_at: new Date().toISOString() });
+    todo.turnos.push({ id: nuevoId(), paciente_id: paciente.id, fecha: p.fecha, hora: p.hora, estado: 'pendiente', duracion, origen: 'link', primera_vez: p.primera_vez, created_at: new Date().toISOString() });
     guardarLocal(todo);
     return 'ok';
   }
@@ -271,7 +276,7 @@ export async function cargarEjemplos(): Promise<void> {
   const { data, error } = await supabase.from('pacientes').insert(PACIENTES_EJEMPLO).select('id');
   fallar(error);
   const ids = (data ?? []).map((p) => p.id as string);
-  const turnos = turnosEjemplo().map((t) => ({ paciente_id: ids[t.indicePaciente], fecha: t.fecha, hora: t.hora, estado: t.estado, origen: t.origen, primera_vez: t.primera_vez }));
+  const turnos = turnosEjemplo().map((t) => ({ paciente_id: ids[t.indicePaciente], fecha: t.fecha, hora: t.hora, estado: t.estado, duracion: t.duracion, origen: t.origen, primera_vez: t.primera_vez }));
   const resultado = await supabase.from('turnos').insert(turnos);
   fallar(resultado.error);
 }

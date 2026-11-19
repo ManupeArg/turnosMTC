@@ -50,7 +50,7 @@ Alternativa sin GitHub: `npx vercel` desde esta carpeta.
 | Qué | Dónde |
 | --- | --- |
 | Nombre del consultorio, profesional, matrícula, dirección | `src/config.ts` (`MARCA`) |
-| Días y horarios de atención, duración del turno | `src/config.ts` (`ATENCION`, `DURACION_MIN`) |
+| Días y horarios de atención, duración de los turnos | `src/config.ts` (`ATENCION`, `DURACION_PRIMERA_VEZ`, `DURACION_HABITUAL`) y las funciones `horario_de_atencion` y `reservar_turno` de `supabase/schema.sql` |
 | Colores (gris y amarillo) | `src/styles.css`, variables de `:root` |
 | Lectura y escritura de datos | `src/lib/datos.ts` |
 | Pantallas | `src/screens/` |
@@ -91,3 +91,18 @@ Cada vez que cambie `supabase/schema.sql`, pegalo completo de nuevo en el SQL Ed
 ## Cuando un paciente avisa que no viene
 
 El turno queda guardado como "No viene" pero deja de ocupar el lugar: ese día y horario vuelve a ofrecerse en el link y en la agenda. Si otro paciente lo toma, el calendario muestra al nuevo y una ✕ roja al lado para abrir el turno que se cayó. Un turno "No viene" no se puede volver a confirmar si el horario ya lo tomó otra persona.
+
+## Duración de los turnos
+
+La agenda va en bloques de 15 minutos. Un turno de primera vez dura 30 minutos y empieza en punto o y media; el de un paciente habitual dura 15 y puede empezar cada cuarto de hora. En el link público la duración sale de la respuesta a "¿Es tu primera vez?"; desde la agenda se elige al cargar el turno y se puede cambiar después. La base impide que dos turnos vigentes se superpongan.
+
+## Recordatorios predeterminados
+
+- Recordatorio 1: el día anterior al mediodía.
+- Recordatorio 2: 3 horas antes del turno; para el primer y el segundo turno del día (los dos más tempranos cargados ese día), 1 hora antes.
+
+Los dos se pueden cambiar en General por una cantidad fija de horas. Si un turno se reserva después del momento en que debía salir un recordatorio, ese recordatorio no se envía. Las reglas están en `src/lib/avisos.ts`.
+
+## Exportar pacientes
+
+En Pacientes, "Exportar" descarga un CSV (se abre con Excel) con la lista tal como se ve: respeta la búsqueda, los filtros y el orden elegidos.

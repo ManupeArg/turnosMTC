@@ -11,9 +11,10 @@ export interface Paciente {
   sexo: string | null;
   /** Cómo conoció el consultorio: 'Red social', 'Recomendación' u 'Otro'. */
   como_nos_conocio: string | null;
+  created_at?: string;
 }
 
-export type DatosPaciente = Omit<Paciente, 'id'>;
+export type DatosPaciente = Omit<Paciente, 'id' | 'created_at'>;
 
 export interface Turno {
   id: string;
@@ -21,6 +22,8 @@ export interface Turno {
   fecha: string; // AAAA-MM-DD
   hora: string; // HH:MM
   estado: Estado;
+  /** Minutos que dura: 30 la primera vez, 15 para pacientes habituales. */
+  duracion: number;
   /** Quién cargó el turno: el consultorio o el paciente desde el link público. */
   origen: 'consultorio' | 'link';
   primera_vez: boolean;
@@ -39,13 +42,16 @@ export interface Bloqueo {
 export interface NoDisponible {
   fecha: string;
   hora: string | null;
+  /** Minutos ocupados desde esa hora (los bloqueos ocupan un bloque de 15). */
+  duracion?: number;
 }
 
 export interface Config {
-  /** Primer aviso por WhatsApp: cuántas horas antes de cada turno se envía. */
-  recordatorio_horas_antes: number;
-  /** Segundo aviso: horas antes del turno, o null si no se envía. */
-  recordatorio2_horas_antes: number | null;
+  /** Recordatorio 1: 'dia_anterior_12' (el día anterior al mediodía) o una cantidad de horas antes ('24'). */
+  aviso1: string;
+  /** Recordatorio 2: '3h_1h_primeros' (3 horas antes; 1 hora antes para el 1.º y 2.º turno del día),
+   *  una cantidad de horas antes ('2') o 'ninguno'. */
+  aviso2: string;
 }
 
 export interface Datos {
@@ -67,5 +73,3 @@ export const SEXOS = ['Femenino', 'Masculino', 'Otro'];
 
 export const COMO_NOS_CONOCIO = ['Red social', 'Recomendación', 'Otro'];
 
-/** Opciones rápidas para el recordatorio (horas antes del turno). */
-export const HORAS_RECORDATORIO = [1, 2, 3, 4, 12, 24, 48];

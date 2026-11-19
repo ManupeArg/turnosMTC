@@ -2,9 +2,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CamposPaciente, formVacio, validarPaciente, type FormPaciente } from '../components/CamposPaciente';
 import { SelectorHorario } from '../components/SelectorHorario';
-import { DIAS_RESERVA, linkWhatsApp, MARCA } from '../config';
+import { DIAS_RESERVA, duracionDe, linkWhatsApp, MARCA } from '../config';
 import * as api from '../lib/datos';
-import { crearOcupado, primerLibre, tieneLugar } from '../lib/disponibilidad';
+import { cabe, crearOcupado, primerLibre, tieneLugar } from '../lib/disponibilidad';
 import { diaLargo, diasHabilesHasta, horaLinda, hoyIso, sumarDias } from '../lib/fechas';
 import type { NoDisponible } from '../types';
 
@@ -22,9 +22,11 @@ export function Reservar() {
 
   const ocupado = useMemo(() => {
     const lista = noDisponibles ?? [];
-    return crearOcupado(lista.filter((n): n is { fecha: string; hora: string } => n.hora !== null), lista.filter((n) => n.hora === null), { sinPasados: true });
+    return crearOcupado(lista.filter((n): n is { fecha: string; hora: string; duracion?: number } => n.hora !== null), lista.filter((n) => n.hora === null), { sinPasados: true });
   }, [noDisponibles]);
-  const dias = useMemo(() => diasPosibles.filter((d) => tieneLugar(ocupado, d)), [diasPosibles, ocupado]);
+  /** 30 minutos la primera vez, 15 si ya es paciente: cambia qué horarios se ofrecen. */
+  const duracion = duracionDe(primeraVez ?? true);
+  const dias = useMemo(() => diasPosibles.filter((d) => tieneLugar(ocupado, d, duracion)), [diasPosibles, ocupado, duracion]);
 
   const cargar = async () => {
     try {
@@ -41,10 +43,10 @@ export function Reservar() {
   useEffect(() => {
     if (!noDisponibles || dias.length === 0) return;
     const f = fecha && dias.includes(fecha) ? fecha : dias[0];
-    const h = hora && !ocupado(f, hora) ? hora : primerLibre(ocupado, f);
+    const h = hora && cabe(ocupado, f, hora, duracion) ? hora : primerLibre(ocupado, f, duracion);
     if (f !== fecha) setFecha(f);
     if (h !== hora) setHora(h);
-  }, [noDisponibles, dias]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [noDisponibles, dias, duracion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const confirmar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,7 +96,7 @@ export function Reservar() {
               <span className="etiqueta">¿Es tu primera vez en el consultorio?</span>
               <div className="chips">
                 <button type="button" aria-pressed={primeraVez === true} className={`chip ${primeraVez === true ? 'chip-activo' : ''}`} onClick={() => setPrimeraVez(true)}>Sí, es mi primera vez</button>
-                <button type="button" aria-pressed={primeraVez === false} className={`chip ${primeraVez === false ? 'chip-activo' : ''}`} onClick={() => setPrimeraVez(false)}>No, ya me atendí</button>
+                <button type="button" aria-pressed={primeraVez === false} className={`chip ${primeraVez === false ? 'chip-activo' : ''}`} onClick={() => setPrimeraVez(false)}>No, ya soy paciente</button>
               </div>
             </div>
 
@@ -108,7 +110,7 @@ export function Reservar() {
                 ) : dias.length === 0 || !fecha ? (
                   <p className="nota">Por ahora no hay horarios libres. Escribinos por WhatsApp y te buscamos un lugar.</p>
                 ) : (
-                  <SelectorHorario dias={dias} fecha={fecha} hora={hora} ocupado={ocupado} soloLibres onCambio={(f, h) => { setFecha(f); setHora(h); }} />
+                  <SelectorHorario dias={dias} fecha={fecha} hora={hora} duracion={duracion} ocupado={ocupado} soloLibres onCambio={(f, h) => { setFecha(f); setHora(h); }} />
                 )}
 
                 {error && <p className="error" role="alert">{error}</p>}

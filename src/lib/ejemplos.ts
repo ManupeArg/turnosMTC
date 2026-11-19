@@ -1,4 +1,5 @@
 import type { DatosPaciente, Estado } from '../types';
+import { duracionDe } from '../config';
 import { proximosDiasHabiles, slotsDe } from './fechas';
 
 // Pacientes ficticios para mostrar la app. No son personas reales.
@@ -25,14 +26,15 @@ const PLAN: [number, number, number, Estado, boolean?][] = [
 
 export const turnosEjemplo = () => {
   const dias = proximosDiasHabiles();
-  const turnos: { indicePaciente: number; fecha: string; hora: string; estado: Estado; origen: 'consultorio' | 'link'; primera_vez: boolean }[] = [];
+  const turnos: { indicePaciente: number; fecha: string; hora: string; estado: Estado; duracion: number; origen: 'consultorio' | 'link'; primera_vez: boolean }[] = [];
   for (const [d, s, p, estado, porLink] of PLAN) {
     const fecha = dias[d];
     if (!fecha) continue;
     const slots = slotsDe(fecha);
-    const hora = slots[s % slots.length];
+    // Los bloques son de 15 minutos: se usan los pares para que caigan en punto o y media.
+    const hora = slots[(s * 2) % slots.length];
     if (turnos.some((t) => t.fecha === fecha && t.hora === hora)) continue;
-    turnos.push({ indicePaciente: p, fecha, hora, estado, origen: porLink ? 'link' : 'consultorio', primera_vez: !!porLink });
+    turnos.push({ indicePaciente: p, fecha, hora, estado, duracion: duracionDe(!!porLink), origen: porLink ? 'link' : 'consultorio', primera_vez: !!porLink });
   }
   return turnos;
 };

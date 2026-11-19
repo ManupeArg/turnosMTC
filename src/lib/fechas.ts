@@ -1,4 +1,4 @@
-import { ATENCION, DIAS_VISIBLES, DURACION_MIN } from '../config';
+import { ATENCION, DIAS_VISIBLES, PASO_MIN } from '../config';
 
 const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const DIAS_CORTOS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
@@ -24,12 +24,19 @@ export const sumarDias = (iso: string, n: number) => {
 const franjasASlots = (franjas: [number, number][]) => {
   const slots: string[] = [];
   for (const [desde, hasta] of franjas) {
-    for (let m = desde * 60; m < hasta * 60; m += DURACION_MIN) slots.push(`${dos(Math.floor(m / 60))}:${dos(m % 60)}`);
+    for (let m = desde * 60; m < hasta * 60; m += PASO_MIN) slots.push(`${dos(Math.floor(m / 60))}:${dos(m % 60)}`);
   }
   return slots;
 };
 
-/** Horarios en los que se atiende ese día. Vacío si el consultorio está cerrado. */
+/** "09:30" → 570 minutos desde medianoche, y al revés. */
+export const aMinutos = (hora: string) => Number(hora.slice(0, 2)) * 60 + Number(hora.slice(3, 5));
+export const deMinutos = (min: number) => `${dos(Math.floor(min / 60))}:${dos(min % 60)}`;
+
+/** true si el horario cae antes de las 13 (para separar mañana y tarde). */
+export const esManana = (hora: string) => aMinutos(hora) < 13 * 60;
+
+/** Bloques de 15 minutos en los que se atiende ese día. Vacío si el consultorio está cerrado. */
 export const slotsDe = (iso: string) => franjasASlots(ATENCION[deIso(iso).getDay()] ?? []);
 
 export const atiende = (iso: string) => slotsDe(iso).length > 0;
@@ -84,27 +91,6 @@ export const yaPaso = (iso: string, hora: string) => {
   const hoy = aIso(ahora);
   if (iso !== hoy) return iso < hoy;
   return hora <= `${dos(ahora.getHours())}:${dos(ahora.getMinutes())}`;
-};
-
-/** "1 hora antes" / "24 horas antes". */
-export const horasAntes = (n: number) => (n === 1 ? '1 hora antes' : `${n} horas antes`);
-
-/** Momento en que sale un aviso N horas antes de un turno: "miércoles 18/11 a las 16:00". */
-export const momentoAntes = (iso: string, hora: string, horas: number) => {
-  const [h, m] = hora.split(':').map(Number);
-  const d = deIso(iso);
-  d.setHours(h - horas, m, 0, 0);
-  return `${diaLargo(aIso(d))} a las ${d.getHours()}:${dos(d.getMinutes())}`;
-};
-
-/** Un aviso que sale N horas antes del turno: cuándo sale y si llega a enviarse.
- *  No se envía si el turno se cargó después de ese momento (ej: aviso de 24 hs y turno sacado 10 hs antes). */
-export const avisoDe = (iso: string, hora: string, horas: number, creado?: string) => {
-  const [h, m] = hora.split(':').map(Number);
-  const sale = deIso(iso);
-  sale.setHours(h - horas, m, 0, 0);
-  const seEnvia = !creado || new Date(creado).getTime() <= sale.getTime();
-  return { cuando: momentoAntes(iso, hora, horas), seEnvia };
 };
 
 /** "8:00" en vez de "08:00", para mostrar. */

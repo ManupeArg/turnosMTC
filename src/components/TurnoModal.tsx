@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { MARCA } from '../config';
-import { avisoDe, diaLargo, horaLinda, horasAntes } from '../lib/fechas';
-import { crearOcupado } from '../lib/disponibilidad';
+import { avisosDe } from '../lib/avisos';
+import { diaLargo, horaLinda } from '../lib/fechas';
+import { cabe, crearOcupado } from '../lib/disponibilidad';
 import { ESTADOS, ORDEN_ESTADOS, type Bloqueo, type Config, type Paciente, type Turno } from '../types';
 import { Modal } from './Modal';
 import { SelectorHorario } from './SelectorHorario';
@@ -13,21 +14,20 @@ interface Props {
   bloqueos: Bloqueo[];
   dias: string[];
   config: Config;
-  onCambiar: (cambios: Partial<Pick<Turno, 'fecha' | 'hora' | 'estado'>>) => void;
+  onCambiar: (cambios: Partial<Pick<Turno, 'fecha' | 'hora' | 'estado' | 'duracion'>>) => void;
   onCancelar: () => void;
   onCerrar: () => void;
 }
 
 export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, onCambiar, onCancelar, onCerrar }: Props) {
   const [confirmando, setConfirmando] = useState(false);
-  const avisos = [
-    { nombre: 'Primer aviso', horas: config.recordatorio_horas_antes },
-    ...(config.recordatorio2_horas_antes != null ? [{ nombre: 'Segundo aviso', horas: config.recordatorio2_horas_antes }] : []),
-  ].map((a) => ({ ...a, ...avisoDe(turno.fecha, turno.hora, a.horas, turno.created_at) }));
+  const avisos = avisosDe(turno, turnos, config);
+  const ocupado = crearOcupado(turnos, bloqueos, { exceptoId: turno.id });
+  const duraciones = [15, 30];
   const diasConTurno = dias.includes(turno.fecha) ? dias : [turno.fecha, ...dias];
 
   return (
-    <Modal titulo={`${paciente.nombre} ${paciente.apellido}`} subtitulo={`${diaLargo(turno.fecha)} · ${horaLinda(turno.hora)} · ${paciente.whatsapp}`} onCerrar={onCerrar}>
+    <Modal titulo={`${paciente.nombre} ${paciente.apellido}`} subtitulo={`${diaLargo(turno.fecha)} · ${horaLinda(turno.hora)} · ${turno.duracion} min · ${paciente.whatsapp}`} onCerrar={onCerrar}>
       {(turno.origen === 'link' || turno.primera_vez) && (
         <div className="chips">
           {turno.origen === 'link' && <span className="pastilla pastilla-gris">Reservado por el link</span>}
@@ -52,7 +52,7 @@ export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, on
         <ul className="avisos">
           {avisos.map((a) => (
             <li key={a.nombre}>
-              <strong>{a.nombre}</strong> · {horasAntes(a.horas)}: {a.seEnvia ? `sale el ${a.cuando}` : 'no se envía, el turno se reservó con menos anticipación'}
+              <strong>{a.nombre}</strong> · {a.regla}: {a.seEnvia ? `sale el ${a.cuando}` : 'no se envía, el turno se reservó con menos anticipación'}
             </li>
           ))}
         </ul>
@@ -66,8 +66,20 @@ export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, on
         </div>
       </div>
 
+      <div className="campo">
+        <span className="etiqueta">Duración</span>
+        <div className="chips">
+          {duraciones.map((d) => (
+            <button key={d} type="button" aria-pressed={turno.duracion === d} disabled={turno.duracion !== d && !cabe(ocupado, turno.fecha, turno.hora, d)}
+              className={`chip ${turno.duracion === d ? 'chip-activo' : ''}`} onClick={() => turno.duracion !== d && onCambiar({ duracion: d })}>
+              {d} minutos
+            </button>
+          ))}
+        </div>
+      </div>
+
       <SelectorHorario
-        dias={diasConTurno} fecha={turno.fecha} hora={turno.hora} ocupado={crearOcupado(turnos, bloqueos, { exceptoId: turno.id })}
+        dias={diasConTurno} fecha={turno.fecha} hora={turno.hora} duracion={turno.duracion} ocupado={ocupado}
         onCambio={(fecha, hora) => hora && onCambiar({ fecha, hora })}
       />
 

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { primerLibre, type Ocupado } from '../lib/disponibilidad';
-import { diaConMes, horaLinda, slotsDe } from '../lib/fechas';
+import { cabe, iniciosDe, primerLibre, type Ocupado } from '../lib/disponibilidad';
+import { diaConMes, esManana, horaLinda } from '../lib/fechas';
 
 interface Props {
   /** Todos los días que se pueden elegir; se muestran de a 6, con flechas para avanzar. */
   dias: string[];
   fecha: string;
   hora: string | null;
+  /** Minutos del turno: define cada cuánto se ofrecen horarios (15 o 30) y cuánto lugar libre hace falta. */
+  duracion: number;
   ocupado: Ocupado;
   /** Página pública: muestra solo los horarios libres en vez de tacharlos. */
   soloLibres?: boolean;
@@ -15,7 +17,7 @@ interface Props {
 
 const POR_PAGINA = 6;
 
-export function SelectorHorario({ dias, fecha, hora, ocupado, soloLibres, onCambio }: Props) {
+export function SelectorHorario({ dias, fecha, hora, duracion, ocupado, soloLibres, onCambio }: Props) {
   const paginaDe = (f: string) => Math.max(0, Math.floor(dias.indexOf(f) / POR_PAGINA));
   const [pagina, setPagina] = useState(() => paginaDe(fecha));
   const ultima = Math.max(0, Math.ceil(dias.length / POR_PAGINA) - 1);
@@ -25,11 +27,14 @@ export function SelectorHorario({ dias, fecha, hora, ocupado, soloLibres, onCamb
 
   const actual = Math.min(pagina, ultima);
   const visibles = dias.slice(actual * POR_PAGINA, actual * POR_PAGINA + POR_PAGINA);
-  const elegirDia = (dia: string) => {
-    const sigue = hora && slotsDe(dia).includes(hora) && !ocupado(dia, hora);
-    onCambio(dia, sigue ? hora : primerLibre(ocupado, dia));
-  };
-  const horarios = slotsDe(fecha).filter((h) => !soloLibres || !ocupado(fecha, h));
+  const libre = (dia: string, h: string) => cabe(ocupado, dia, h, duracion);
+  const elegirDia = (dia: string) => onCambio(dia, hora && libre(dia, hora) ? hora : primerLibre(ocupado, dia, duracion));
+
+  const horarios = iniciosDe(fecha, duracion).filter((h) => !soloLibres || libre(fecha, h));
+  const franjas = [
+    { nombre: 'Por la mañana', horarios: horarios.filter(esManana) },
+    { nombre: 'Por la tarde', horarios: horarios.filter((h) => !esManana(h)) },
+  ].filter((f) => f.horarios.length > 0);
 
   return (
     <>
@@ -48,14 +53,21 @@ export function SelectorHorario({ dias, fecha, hora, ocupado, soloLibres, onCamb
         </div>
       </div>
       <div className="campo">
-        <span className="etiqueta">{soloLibres ? `Horarios disponibles el ${diaConMes(fecha)}` : `Horario del ${diaConMes(fecha)} (tachados: ocupados o bloqueados)`}</span>
-        <div className="chips chips-horas">
-          {horarios.map((h) => (
-            <button key={h} type="button" disabled={ocupado(fecha, h)} className={`chip ${h === hora ? 'chip-activo' : ''}`} aria-pressed={h === hora} onClick={() => onCambio(fecha, h)}>
-              {horaLinda(h)}
-            </button>
-          ))}
-        </div>
+        <span className="etiqueta">
+          {soloLibres ? `Horarios disponibles el ${diaConMes(fecha)}` : `Horario del ${diaConMes(fecha)} (tachados: ocupados o bloqueados)`} · turno de {duracion} minutos
+        </span>
+        {franjas.map((f) => (
+          <div key={f.nombre} className="franja">
+            <span className="franja-nombre">{f.nombre}</span>
+            <div className="chips chips-horas">
+              {f.horarios.map((h) => (
+                <button key={h} type="button" disabled={!libre(fecha, h)} className={`chip ${h === hora ? 'chip-activo' : ''}`} aria-pressed={h === hora} onClick={() => onCambio(fecha, h)}>
+                  {horaLinda(h)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
         {horarios.length === 0 && <p className="suave">No quedan horarios libres ese día.</p>}
       </div>
     </>

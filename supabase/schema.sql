@@ -84,57 +84,97 @@ language sql stable as $$
   select (now() at time zone 'America/Argentina/Cordoba')::date
 $$;
 
--- Horario de atención: lunes a viernes de 8 a 12 y de 16 a 20, jueves solo a la tarde, turnos cada 30 minutos.
--- IMPORTANTE: si cambiás ATENCION o DURACION_MIN en src/config.ts, cambiá también esta función.
-create or replace function public.horario_de_atencion(p_fecha date, p_hora text) returns boolean
+-- =====================================================================
+-- Versión 5: turnos de 15 o 30 minutos y recordatorios predeterminados
+-- =====================================================================
+
+-- Hace falta para impedir que dos turnos se superpongan.
+create extension if not exists btree_gist;
+
+-- "09:30" -> 570 (minutos desde la medianoche).
+create or replace function public.minutos(p_hora text) returns integer
+language sql immutable as $$
+  select split_part(p_hora, ':', 1)::int * 60 + split_part(p_hora, ':', 2)::int
+$$;
+
+-- Duración de cada turno: 30 minutos la primera vez, 15 para pacientes habituales.
+-- Los turnos y bloqueos que ya existían eran de 30 minutos y se conservan así (esto corre una sola vez).
+do $$
+begin
+  if not exists (select 1 from information_schema.columns
+                  where table_schema = 'public' and table_name = 'turnos' and column_name = 'duracion') then
+    alter table public.turnos add column duracion integer not null default 30;
+    insert into public.bloqueos (fecha, hora)
+    select b.fecha, to_char(make_interval(mins => public.minutos(b.hora) + 15), 'HH24:MI')
+      from public.bloqueos b where b.hora is not null
+    on conflict do nothing;
+  end if;
+end $$;
+alter table public.turnos alter column duracion set default 15;
+alter table public.turnos drop constraint if exists turnos_duracion_check;
+alter table public.turnos add constraint turnos_duracion_check check (duracion in (15, 30));
+
+-- Dos turnos vigentes no pueden pisarse. Los "no viene" quedan guardados pero no ocupan lugar.
+drop index if exists public.turnos_horario_vigente;
+alter table public.turnos drop constraint if exists turnos_fecha_hora_key;
+alter table public.turnos drop constraint if exists turnos_sin_superposicion;
+alter table public.turnos add constraint turnos_sin_superposicion exclude using gist (
+  fecha with =,
+  int4range(public.minutos(hora), public.minutos(hora) + duracion) with &&
+) where (estado <> 'no_viene');
+
+-- Recordatorios por WhatsApp.
+--   aviso1: 'dia_anterior_12' (el día anterior al mediodía) o una cantidad de horas antes ('24').
+--   aviso2: '3h_1h_primeros' (3 horas antes; 1 hora antes para el 1.º y 2.º turno del día), horas antes ('2') o 'ninguno'.
+-- (Las columnas recordatorio_* de versiones anteriores quedan sin uso.)
+alter table public.configuracion add column if not exists aviso1 text not null default 'dia_anterior_12';
+alter table public.configuracion add column if not exists aviso2 text not null default '3h_1h_primeros';
+alter table public.configuracion drop constraint if exists configuracion_aviso1_check;
+alter table public.configuracion add constraint configuracion_aviso1_check check (aviso1 ~ '^(dia_anterior_12|[0-9]{1,3})$');
+alter table public.configuracion drop constraint if exists configuracion_aviso2_check;
+alter table public.configuracion add constraint configuracion_aviso2_check check (aviso2 ~ '^(3h_1h_primeros|ninguno|[0-9]{1,3})$');
+alter table public.configuracion add column if not exists recordatorio_horas_antes integer not null default 24;
+alter table public.pacientes add column if not exists como_nos_conocio text;
+
+-- Las funciones cambiaron de parámetros o de resultado: se borran las versiones anteriores.
+drop function if exists public.horario_de_atencion(date, text);
+drop function if exists public.horarios_no_disponibles(date, date);
+drop function if exists public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text);
+
+-- Horario de atención: lunes a viernes de 8 a 12 y de 16 a 20, jueves solo a la tarde.
+-- Los turnos de 15 minutos empiezan cada 15; los de 30, en punto o y media.
+-- IMPORTANTE: si cambiás ATENCION en src/config.ts, cambiá también esta función.
+create or replace function public.horario_de_atencion(p_fecha date, p_hora text, p_duracion integer) returns boolean
 language plpgsql immutable as $$
 declare
   v_dia int;
-  v_h int;
-  v_m int;
+  v_ini int;
+  v_fin int;
 begin
-  if p_fecha is null or p_hora is null or p_hora !~ '^[0-2][0-9]:[0-5][0-9]$' then return false; end if;
+  if p_fecha is null or p_hora is null or p_hora !~ '^[0-2][0-9]:[0-5][0-9]$' or p_duracion not in (15, 30) then return false; end if;
   v_dia := extract(isodow from p_fecha);  -- 1 = lunes ... 7 = domingo
-  v_h := split_part(p_hora, ':', 1)::int;
-  v_m := split_part(p_hora, ':', 2)::int;
-  if v_dia > 5 or v_m not in (0, 30) then return false; end if;
-  if v_h >= 16 and v_h < 20 then return true; end if;
-  if v_h >= 8 and v_h < 12 and v_dia <> 4 then return true; end if;
+  v_ini := public.minutos(p_hora);
+  v_fin := v_ini + p_duracion;
+  if v_dia > 5 or v_ini % p_duracion <> 0 then return false; end if;
+  if v_ini >= 16 * 60 and v_fin <= 20 * 60 then return true; end if;
+  if v_ini >= 8 * 60 and v_fin <= 12 * 60 and v_dia <> 4 then return true; end if;
   return false;
 end;
 $$;
 
--- Lo único que puede leer la página pública: qué horarios NO están libres. No devuelve datos de pacientes.
+-- Lo único que puede leer la página pública: qué horarios NO están libres y cuántos minutos ocupan.
+-- No devuelve datos de pacientes. hora null = día completo bloqueado.
 create or replace function public.horarios_no_disponibles(desde date, hasta date)
-returns table (fecha date, hora text)
+returns table (fecha date, hora text, duracion integer)
 language sql stable security definer set search_path = public as $$
-  select t.fecha, t.hora from public.turnos t where t.fecha between desde and hasta and t.estado <> 'no_viene'
+  select t.fecha, t.hora, t.duracion from public.turnos t where t.fecha between desde and hasta and t.estado <> 'no_viene'
   union
-  select b.fecha, b.hora from public.bloqueos b where b.fecha between desde and hasta
+  select b.fecha, b.hora, 15 from public.bloqueos b where b.fecha between desde and hasta
 $$;
-
--- Versión 3: el recordatorio se configura en horas antes del turno, y se guarda cómo nos conoció el paciente.
--- (Las columnas viejas recordatorio_cuando y recordatorio_hora quedan sin uso; no molestan.)
-alter table public.configuracion add column if not exists recordatorio_horas_antes integer not null default 24;
-alter table public.configuracion drop constraint if exists configuracion_horas_check;
-alter table public.configuracion add constraint configuracion_horas_check check (recordatorio_horas_antes between 1 and 168);
-alter table public.pacientes add column if not exists como_nos_conocio text;
-
--- Versión 4: segundo aviso, y los turnos "no viene" liberan su día y horario.
-alter table public.configuracion add column if not exists recordatorio2_horas_antes integer default 2;
-alter table public.configuracion drop constraint if exists configuracion_horas2_check;
-alter table public.configuracion add constraint configuracion_horas2_check check (recordatorio2_horas_antes is null or recordatorio2_horas_antes between 1 and 168);
-
--- Antes no podía haber dos turnos en el mismo día y horario. Ahora sí, siempre que a lo sumo uno esté vigente:
--- los que avisaron que no vienen quedan guardados pero no ocupan el lugar.
-alter table public.turnos drop constraint if exists turnos_fecha_hora_key;
-create unique index if not exists turnos_horario_vigente on public.turnos (fecha, hora) where estado <> 'no_viene';
-
--- La función de reserva cambió de parámetros: se borra la versión anterior para que no queden dos.
-drop function if exists public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text);
 
 -- Reserva desde el link. Devuelve 'ok', 'ocupado', 'limite' o 'invalido'.
 -- Reconoce al paciente por los últimos 10 dígitos del WhatsApp; si no existe, lo crea.
+-- El turno dura 30 minutos si es la primera vez y 15 si ya es paciente.
 create or replace function public.reservar_turno(
   p_nombre text, p_apellido text, p_whatsapp text, p_fecha date, p_hora text,
   p_primera_vez boolean default false, p_email text default null, p_ciudad text default null,
@@ -145,6 +185,8 @@ declare
   v_digitos text := right(regexp_replace(coalesce(p_whatsapp, ''), '\D', '', 'g'), 10);
   v_hoy date := public.hoy_local();
   v_ahora text := to_char(now() at time zone 'America/Argentina/Cordoba', 'HH24:MI');
+  v_duracion int := case when coalesce(p_primera_vez, false) then 30 else 15 end;
+  v_ini int;
   v_paciente uuid;
 begin
   if length(trim(coalesce(p_nombre, ''))) < 2 or length(trim(coalesce(p_apellido, ''))) < 2 or length(v_digitos) < 8
@@ -153,12 +195,15 @@ begin
      or length(coalesce(p_como_nos_conocio, '')) > 40 then
     return 'invalido';
   end if;
-  if p_fecha < v_hoy or p_fecha > v_hoy + 365 or not public.horario_de_atencion(p_fecha, p_hora)
+  if p_fecha < v_hoy or p_fecha > v_hoy + 365 or not public.horario_de_atencion(p_fecha, p_hora, v_duracion)
      or (p_fecha = v_hoy and p_hora <= v_ahora) then
     return 'invalido';
   end if;
-  if exists (select 1 from public.bloqueos b where b.fecha = p_fecha and (b.hora is null or b.hora = p_hora))
-     or exists (select 1 from public.turnos t where t.fecha = p_fecha and t.hora = p_hora and t.estado <> 'no_viene') then
+  v_ini := public.minutos(p_hora);
+  if exists (select 1 from public.bloqueos b where b.fecha = p_fecha
+              and (b.hora is null or (public.minutos(b.hora) >= v_ini and public.minutos(b.hora) < v_ini + v_duracion)))
+     or exists (select 1 from public.turnos t where t.fecha = p_fecha and t.estado <> 'no_viene'
+                 and public.minutos(t.hora) < v_ini + v_duracion and public.minutos(t.hora) + t.duracion > v_ini) then
     return 'ocupado';
   end if;
 
@@ -177,9 +222,9 @@ begin
   end if;
 
   begin
-    insert into public.turnos (paciente_id, fecha, hora, estado, origen, primera_vez)
-    values (v_paciente, p_fecha, p_hora, 'pendiente', 'link', coalesce(p_primera_vez, false));
-  exception when unique_violation then
+    insert into public.turnos (paciente_id, fecha, hora, duracion, estado, origen, primera_vez)
+    values (v_paciente, p_fecha, p_hora, v_duracion, 'pendiente', 'link', coalesce(p_primera_vez, false));
+  exception when unique_violation or exclusion_violation then
     return 'ocupado';
   end;
   return 'ok';

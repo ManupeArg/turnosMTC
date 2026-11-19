@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { diaBloqueado, horaBloqueada, ocupaLugar } from '../lib/disponibilidad';
+import { cubre, diaBloqueado, horaBloqueada, ocupaLugar } from '../lib/disponibilidad';
 import { Modal } from '../components/Modal';
-import { DIAS_VISIBLES } from '../config';
-import { diaConMes, diaCorto, diaLargo, filasCalendario, horaLinda, hoyIso, proximosDiasHabiles, slotsDe } from '../lib/fechas';
+import { DIAS_VISIBLES, PASO_MIN } from '../config';
+import { diaConMes, diaCorto, diaLargo, esManana, filasCalendario, horaLinda, hoyIso, proximosDiasHabiles, slotsDe } from '../lib/fechas';
 import { useEsMovil } from '../lib/useEsMovil';
 import { ESTADOS, ORDEN_ESTADOS, type Datos, type Turno } from '../types';
 
@@ -15,7 +15,8 @@ interface Props {
 }
 
 export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbloquear }: Props) {
-  const esMovil = useEsMovil();
+  // En tablet vertical entra la grilla completa; la lista por día queda solo para el celular.
+  const esMovil = useEsMovil(640);
   const [pagina, setPagina] = useState(0);
   /** Página 0 = desde hoy; cada página avanza DIAS_VISIBLES días hábiles. */
   const dias = useMemo(() => proximosDiasHabiles(DIAS_VISIBLES * (pagina + 1)).slice(-DIAS_VISIBLES), [pagina]);
@@ -30,8 +31,10 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
     const p = datos.pacientes.find((x) => x.id === t.paciente_id);
     return p ? `${p.nombre} ${p.apellido}` : 'Paciente';
   };
-  /** El turno vigente de ese horario (los que avisaron que no vienen no ocupan lugar). */
+  /** El turno vigente que EMPIEZA en ese bloque (los que avisaron que no vienen no ocupan lugar). */
   const turnoEn = (fecha: string, hora: string) => datos.turnos.find((t) => ocupaLugar(t) && t.fecha === fecha && t.hora === hora);
+  /** true si el bloque es la continuación de un turno que empezó antes (uno de 30 minutos ocupa dos bloques). */
+  const continua = (fecha: string, hora: string) => datos.turnos.some((t) => ocupaLugar(t) && t.hora !== hora && cubre(t, fecha, hora));
   /** Turnos de ese horario cuyo paciente avisó que no viene: el lugar quedó libre. */
   const noVienenEn = (fecha: string, hora: string) => datos.turnos.filter((t) => !ocupaLugar(t) && t.fecha === fecha && t.hora === hora);
   const cantidad = (fecha: string) => datos.turnos.filter((t) => ocupaLugar(t) && t.fecha === fecha).length;
@@ -116,6 +119,48 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
   if (esMovil) {
     const dia = dias.includes(diaMovil) ? diaMovil : dias[0];
     const cerrado = diaBloqueado(bloqueos, dia);
+    const filaDe = (h: string) => {
+      const t = turnoEn(dia, h);
+      const b = horaBloqueada(bloqueos, dia, h);
+      const cancelados = noVienenEn(dia, h).map((c) => (
+        <button key={c.id} type="button" className={`agenda-fila agenda-cancelado ${ESTADOS[c.estado].clase}`} onClick={() => onAbrirTurno(c.id)}>
+          <span className="fila-hora">{horaLinda(h)}</span>
+          <span className="agenda-texto"><strong>{nombre(c)}</strong><span>{ESTADOS[c.estado].marca} {ESTADOS[c.estado].nombre} · horario liberado</span></span>
+        </button>
+      ));
+      let fila = null;
+      if (t) fila = (
+        <button type="button" className={`agenda-fila ${ESTADOS[t.estado].clase}`} onClick={() => onAbrirTurno(t.id)}>
+          <span className="fila-hora">{horaLinda(h)}</span>
+          <span className="agenda-texto"><strong>{nombre(t)}</strong><span>{ESTADOS[t.estado].marca} {ESTADOS[t.estado].nombre} · {t.duracion} min{t.primera_vez ? ' · Primera vez' : ''}</span></span>
+        </button>
+      );
+      else if (continua(dia, h)) fila = null; // segundo bloque de un turno de 30 minutos
+      else if (cerrado) fila = (
+        <div className="agenda-fila agenda-bloqueada">
+          <span className="fila-hora">{horaLinda(h)}</span>
+          <span className="agenda-texto"><span>Bloqueado</span></span>
+        </div>
+      );
+      else if (b) fila = (
+        <button type="button" className="agenda-fila agenda-bloqueada" disabled={!modoBloqueo} onClick={() => onDesbloquear(b.id)}>
+          <span className="fila-hora">{horaLinda(h)}</span>
+          <span className="agenda-texto"><span>{modoBloqueo ? 'Bloqueado · tocá para liberar' : 'Bloqueado'}</span></span>
+        </button>
+      );
+      else fila = (
+        <button type="button" className="agenda-fila agenda-libre" onClick={() => (modoBloqueo ? onBloquear(dia, h) : onAgregar(dia, h))}>
+          <span className="fila-hora">{horaLinda(h)}</span>
+          <span className="agenda-texto"><span>{modoBloqueo ? 'Libre · tocá para bloquear' : 'Libre · + Agregar turno'}</span></span>
+        </button>
+      );
+      if (!fila && cancelados.length === 0) return null;
+      return <div key={h} className="agenda-grupo">{cancelados}{fila}</div>;
+    };
+    const franjas = [
+      { nombre: 'Por la mañana', horas: slotsDe(dia).filter(esManana) },
+      { nombre: 'Por la tarde', horas: slotsDe(dia).filter((h) => !esManana(h)) },
+    ].filter((f) => f.horas.length > 0);
     return (
       <div className="pantalla">
         {cabecera}
@@ -132,44 +177,12 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
           <h2>{dia === hoy ? 'Hoy, ' : ''}{diaLargo(dia)}{cerrado ? ' · día bloqueado' : ''}</h2>
           {modoBloqueo && botonDia(dia)}
         </div>
-        <div className="agenda-movil">
-          {slotsDe(dia).map((h) => {
-            const t = turnoEn(dia, h);
-            const b = horaBloqueada(bloqueos, dia, h);
-            const cancelados = noVienenEn(dia, h).map((c) => (
-              <button key={c.id} type="button" className={`agenda-fila agenda-cancelado ${ESTADOS[c.estado].clase}`} onClick={() => onAbrirTurno(c.id)}>
-                <span className="fila-hora">{horaLinda(h)}</span>
-                <span className="agenda-texto"><strong>{nombre(c)}</strong><span>{ESTADOS[c.estado].marca} {ESTADOS[c.estado].nombre} · horario liberado</span></span>
-              </button>
-            ));
-            let fila;
-            if (t) fila = (
-              <button type="button" className={`agenda-fila ${ESTADOS[t.estado].clase}`} onClick={() => onAbrirTurno(t.id)}>
-                <span className="fila-hora">{horaLinda(h)}</span>
-                <span className="agenda-texto"><strong>{nombre(t)}</strong><span>{ESTADOS[t.estado].marca} {ESTADOS[t.estado].nombre}{t.primera_vez ? ' · Primera vez' : ''}</span></span>
-              </button>
-            );
-            else if (cerrado) fila = (
-              <div className="agenda-fila agenda-bloqueada">
-                <span className="fila-hora">{horaLinda(h)}</span>
-                <span className="agenda-texto"><span>Bloqueado</span></span>
-              </div>
-            );
-            else if (b) fila = (
-              <button type="button" className="agenda-fila agenda-bloqueada" disabled={!modoBloqueo} onClick={() => onDesbloquear(b.id)}>
-                <span className="fila-hora">{horaLinda(h)}</span>
-                <span className="agenda-texto"><span>{modoBloqueo ? 'Bloqueado · tocá para liberar' : 'Bloqueado'}</span></span>
-              </button>
-            );
-            else fila = (
-              <button type="button" className="agenda-fila agenda-libre" onClick={() => (modoBloqueo ? onBloquear(dia, h) : onAgregar(dia, h))}>
-                <span className="fila-hora">{horaLinda(h)}</span>
-                <span className="agenda-texto"><span>{modoBloqueo ? 'Libre · tocá para bloquear' : 'Libre · + Agregar turno'}</span></span>
-              </button>
-            );
-            return <div key={h} className="agenda-grupo">{cancelados}{fila}</div>;
-          })}
-        </div>
+        {franjas.map((f) => (
+          <section key={f.nombre} className="agenda-movil">
+            <h3>{f.nombre}</h3>
+            {f.horas.map(filaDe)}
+          </section>
+        ))}
       </div>
     );
   }
@@ -178,7 +191,7 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
     <div className="pantalla">
       {cabecera}
       <div className="cal-caja">
-        <div className={`cal ${modoBloqueo ? 'cal-modo-bloqueo' : ''}`} style={{ gridTemplateColumns: `60px repeat(${dias.length}, minmax(0, 1fr))` }}>
+        <div className={`cal ${modoBloqueo ? 'cal-modo-bloqueo' : ''}`} style={{ gridTemplateColumns: `52px repeat(${dias.length}, minmax(0, 1fr))` }}>
           <div />
           {dias.map((d) => (
             <div key={d} className={`cal-dia ${d === hoy ? 'cal-dia-hoy' : ''}`}>
@@ -189,23 +202,30 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
           ))}
           {filas.map((h, i) => {
             const corte = i > 0 && Number(h.slice(0, 2)) - Number(filas[i - 1].slice(0, 2)) > 1;
+            const marca = h.endsWith(':00') ? 'cal-en-punto' : h.endsWith(':30') ? 'cal-y-media' : '';
             return (
               <div key={h} style={{ display: 'contents' }}>
-                <div className={`cal-hora ${corte ? 'cal-corte' : ''}`}>{h.endsWith(':00') ? horaLinda(h) : ''}</div>
+                {corte && <div className="cal-franja" style={{ gridColumn: '1 / -1' }}>Por la tarde</div>}
+                {i === 0 && <div className="cal-franja" style={{ gridColumn: '1 / -1' }}>Por la mañana</div>}
+                <div className="cal-hora">{h.endsWith(':00') || h.endsWith(':30') ? horaLinda(h) : ''}</div>
                 {dias.map((d) => {
                   const t = turnoEn(d, h);
                   const abierto = slotsDe(d).includes(h);
                   const b = horaBloqueada(bloqueos, d, h);
-                  let contenido;
+                  const sigue = !t && continua(d, h);
+                  let contenido = null;
                   if (t) {
+                    const bloques = Math.max(1, Math.round(t.duracion / PASO_MIN));
                     contenido = (
-                      <button type="button" className={`cal-turno ${ESTADOS[t.estado].clase}`} onClick={() => onAbrirTurno(t.id)}
-                        aria-label={`${nombre(t)}, ${diaLargo(d)} ${horaLinda(h)}, ${ESTADOS[t.estado].nombre}${t.primera_vez ? ', primera vez' : ''}`}>
+                      <button type="button" className={`cal-turno ${ESTADOS[t.estado].clase}`} onClick={() => onAbrirTurno(t.id)} style={{ height: `calc(${bloques} * var(--alto-bloque) - 4px)` }}
+                        aria-label={`${nombre(t)}, ${diaLargo(d)} ${horaLinda(h)}, ${t.duracion} minutos, ${ESTADOS[t.estado].nombre}${t.primera_vez ? ', primera vez' : ''}`}>
                         <span aria-hidden="true">{ESTADOS[t.estado].marca}</span>
                         <span className="cal-turno-nombre">{nombre(t)}</span>
                         {t.primera_vez && <span className="cal-nuevo" title="Primera vez">1ª</span>}
                       </button>
                     );
+                  } else if (sigue) {
+                    contenido = null;
                   } else if (!abierto) {
                     contenido = <div className="cal-cerrado" title="No se atiende" />;
                   } else if (diaBloqueado(bloqueos, d)) {
@@ -217,16 +237,16 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
                   } else if (modoBloqueo) {
                     contenido = <button type="button" className="cal-libre" onClick={() => onBloquear(d, h)} aria-label={`Bloquear el ${diaLargo(d)} a las ${horaLinda(h)}`}>Bloquear</button>;
                   } else {
-                    contenido = <button type="button" className="cal-libre" onClick={() => onAgregar(d, h)} aria-label={`Agregar turno el ${diaLargo(d)} a las ${horaLinda(h)}`}>+ Turno</button>;
+                    contenido = <button type="button" className="cal-libre" onClick={() => onAgregar(d, h)} aria-label={`Agregar turno el ${diaLargo(d)} a las ${horaLinda(h)}`}>+ {horaLinda(h)}</button>;
                   }
                   const cancelado = abierto ? noVienenEn(d, h)[0] : undefined;
                   return (
-                    <div key={d} className={`cal-celda ${cancelado ? 'cal-celda-doble' : ''} ${corte ? 'cal-corte' : ''} ${h.endsWith(':00') ? 'cal-en-punto' : ''}`}>
+                    <div key={d} className={`cal-celda ${cancelado ? 'cal-celda-doble' : ''} ${sigue ? 'cal-continua' : ''} ${marca}`}>
                       {cancelado && (
                         <button type="button" className={`cal-turno cal-cancelado ${ESTADOS[cancelado.estado].clase}`} onClick={() => onAbrirTurno(cancelado.id)}
                           aria-label={`${nombre(cancelado)} avisó que no viene el ${diaLargo(d)} a las ${horaLinda(h)}. Horario liberado.`} title={`${nombre(cancelado)}: no viene`}>
                           <span aria-hidden="true">✕</span>
-                          {!t && <span className="cal-turno-nombre">{nombre(cancelado)}</span>}
+                          {!t && !sigue && <span className="cal-turno-nombre">{nombre(cancelado)}</span>}
                         </button>
                       )}
                       {contenido}
