@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { MARCA } from '../config';
 import { diaLargo, horaLinda } from '../lib/fechas';
-import { ESTADOS, ORDEN_ESTADOS, type Config, type Paciente, type Turno } from '../types';
+import { crearOcupado } from '../lib/disponibilidad';
+import { ESTADOS, ORDEN_ESTADOS, type Bloqueo, type Config, type Paciente, type Turno } from '../types';
 import { Modal } from './Modal';
 import { SelectorHorario } from './SelectorHorario';
 
@@ -9,6 +10,7 @@ interface Props {
   turno: Turno;
   paciente: Paciente;
   turnos: Turno[];
+  bloqueos: Bloqueo[];
   dias: string[];
   config: Config;
   onCambiar: (cambios: Partial<Pick<Turno, 'fecha' | 'hora' | 'estado'>>) => void;
@@ -16,13 +18,19 @@ interface Props {
   onCerrar: () => void;
 }
 
-export function TurnoModal({ turno, paciente, turnos, dias, config, onCambiar, onCancelar, onCerrar }: Props) {
+export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, onCambiar, onCancelar, onCerrar }: Props) {
   const [confirmando, setConfirmando] = useState(false);
   const diasConTurno = dias.includes(turno.fecha) ? dias : [turno.fecha, ...dias];
   const cuando = config.recordatorio_cuando === 'dia_anterior' ? 'el día anterior' : 'el mismo día';
 
   return (
     <Modal titulo={`${paciente.nombre} ${paciente.apellido}`} subtitulo={`${diaLargo(turno.fecha)} · ${horaLinda(turno.hora)} · ${paciente.whatsapp}`} onCerrar={onCerrar}>
+      {(turno.origen === 'link' || turno.primera_vez) && (
+        <div className="chips">
+          {turno.origen === 'link' && <span className="pastilla pastilla-gris">Reservado por el link</span>}
+          {turno.primera_vez && <span className="pastilla pastilla-amarilla">Primera vez</span>}
+        </div>
+      )}
       <div className="campo">
         <span className="etiqueta">Estado</span>
         <div className="chips">
@@ -47,7 +55,7 @@ export function TurnoModal({ turno, paciente, turnos, dias, config, onCambiar, o
       </div>
 
       <SelectorHorario
-        dias={diasConTurno} fecha={turno.fecha} hora={turno.hora} turnos={turnos} exceptoId={turno.id}
+        dias={diasConTurno} fecha={turno.fecha} hora={turno.hora} ocupado={crearOcupado(turnos, bloqueos, { exceptoId: turno.id })}
         onCambio={(fecha, hora) => hora && onCambiar({ fecha, hora })}
       />
 

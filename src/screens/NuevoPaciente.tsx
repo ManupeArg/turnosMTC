@@ -1,20 +1,23 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { CamposPaciente, formVacio, validarPaciente, type FormPaciente } from '../components/CamposPaciente';
-import { primerLibre, SelectorHorario } from '../components/SelectorHorario';
-import type { Config, DatosPaciente, Turno } from '../types';
+import { SelectorHorario } from '../components/SelectorHorario';
+import { crearOcupado, primerLibre } from '../lib/disponibilidad';
+import type { Bloqueo, Config, DatosPaciente, Turno } from '../types';
 
 interface Props {
   turnos: Turno[];
+  bloqueos: Bloqueo[];
   dias: string[];
   config: Config;
   onGuardar: (datos: DatosPaciente, turno: { fecha: string; hora: string } | null) => Promise<boolean>;
 }
 
-export function NuevoPaciente({ turnos, dias, config, onGuardar }: Props) {
+export function NuevoPaciente({ turnos, bloqueos, dias, config, onGuardar }: Props) {
+  const ocupado = useMemo(() => crearOcupado(turnos, bloqueos), [turnos, bloqueos]);
   const [form, setForm] = useState<FormPaciente>(formVacio);
   const [conTurno, setConTurno] = useState(true);
   const [fecha, setFecha] = useState(dias[0]);
-  const [hora, setHora] = useState<string | null>(() => primerLibre(turnos, dias[0]));
+  const [hora, setHora] = useState<string | null>(() => primerLibre(ocupado, dias[0]));
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
   const cuando = config.recordatorio_cuando === 'dia_anterior' ? 'el día anterior' : 'el mismo día';
@@ -42,7 +45,7 @@ export function NuevoPaciente({ turnos, dias, config, onGuardar }: Props) {
           <input type="checkbox" checked={conTurno} onChange={(e) => setConTurno(e.target.checked)} />
           <span>Agendar el primer turno ahora</span>
         </label>
-        {conTurno && <SelectorHorario dias={dias} fecha={fecha} hora={hora} turnos={turnos} onCambio={(f, h) => { setFecha(f); setHora(h); }} />}
+        {conTurno && <SelectorHorario dias={dias} fecha={fecha} hora={hora} ocupado={ocupado} onCambio={(f, h) => { setFecha(f); setHora(h); }} />}
         {error && <p className="error" role="alert">{error}</p>}
         <div className="formulario-pie">
           <button className="btn btn-primario btn-grande" disabled={guardando}>{conTurno ? 'Guardar paciente y turno' : 'Guardar paciente'}</button>

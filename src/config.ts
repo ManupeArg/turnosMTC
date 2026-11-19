@@ -7,7 +7,24 @@ export const MARCA = {
   matricula: 'M.P. 084',
   direccion: 'Catamarca 312',
   horarios: 'Lunes a viernes de 8 a 12 y de 16 a 20 hs. Jueves solo por la tarde.',
+  /** WhatsApp del consultorio, solo números con código de país (ej: '5493851234567').
+   *  Vacío = el botón abre WhatsApp sin destinatario, para simular. */
+  whatsapp: '',
 };
+
+/** Link para escribirle al consultorio por WhatsApp con un mensaje ya armado. */
+export const linkWhatsApp = (texto: string) =>
+  `https://wa.me/${MARCA.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(texto)}`;
+
+/** Ruta de la página pública donde el paciente elige su turno. */
+export const RUTA_RESERVA = '/reservar';
+
+/** Hasta cuántos días corridos hacia adelante se puede reservar desde el link (un año).
+ *  Si lo cambiás, cambiá también el tope en la función reservar_turno de supabase/schema.sql. */
+export const DIAS_RESERVA = 365;
+
+/** Hasta cuántos días hábiles hacia adelante puede elegir el consultorio al cargar o mover un turno. */
+export const DIAS_AGENDA = 130;
 
 /** Duración de cada turno, en minutos. */
 export const DURACION_MIN = 30;

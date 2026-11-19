@@ -19,6 +19,10 @@ Abrí la dirección que muestra la terminal. Sin Supabase configurado la app arr
 2. En **SQL Editor**, pegá el contenido de `supabase/schema.sql` y ejecutalo. Crea las tablas `pacientes`, `turnos` y `configuracion`, con acceso solo para usuarios con sesión iniciada.
 3. En **Authentication > Users**, creá el usuario que va a ingresar (mail y contraseña) y marcá la opción de confirmarlo automáticamente.
 4. En **Project Settings > API**, copiá la *Project URL* y la clave *anon public*.
+anon:
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdyaXF0dGFmaWxhdGdwZXN3d2h5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4OTMzNTEsImV4cCI6MjExMDQ2OTM1MX0.LlNLtYF_ByTHP00OJ80gUDGAggaKSrlNXIlS7ewp39c
+project url: 
+https://griqttafilatgpeswwhy.supabase.co
 5. Copiá `.env.example` como `.env.local` y completá:
 
    ```
@@ -60,3 +64,26 @@ Hoy el recordatorio se **configura** (cuándo y a qué hora) y la respuesta del 
 - Un webhook que reciba la respuesta y actualice `turnos.estado`.
 
 Las dos últimas se pueden hacer con funciones de Vercel o de Supabase sin cambiar el resto de la app.
+
+## Link de reserva para pacientes
+
+La página pública está en `/reservar` (por ejemplo `https://tu-app.vercel.app/reservar`). En la pantalla **General** está el link listo para copiar o mandar por WhatsApp.
+
+El paciente dice si es su primera vez, completa sus datos y elige día y horario entre los libres. El turno entra al calendario como "Falta confirmación", marcado como reservado por el link y, si corresponde, "Primera vez".
+
+- Si ya se atendió, se lo reconoce por el WhatsApp (últimos 10 dígitos) y no se duplica el paciente.
+- Cada paciente puede tener hasta 2 turnos futuros reservados.
+- Se puede reservar cualquier día hábil hasta un año hacia adelante (`DIAS_RESERVA` en `src/config.ts` y el tope de `reservar_turno` en `schema.sql`).
+- El botón de WhatsApp de la página usa `MARCA.whatsapp` de `src/config.ts`. Mientras esté vacío abre WhatsApp sin destinatario (sirve para simular).
+- La página no puede leer pacientes ni turnos: solo usa las funciones `horarios_no_disponibles` y `reservar_turno` de `supabase/schema.sql`.
+- Los horarios de atención están en dos lugares: `src/config.ts` (lo que se muestra) y la función `horario_de_atencion` de `schema.sql` (lo que el servidor acepta). Si cambian, hay que cambiar los dos.
+
+## Bloquear días y horarios
+
+En **Calendario**, el botón "Bloquear días y horarios" activa el modo bloqueo: se toca un horario libre para bloquearlo, uno bloqueado para liberarlo, o se bloquea un día completo (también fechas más lejanas, con el selector de fecha). Lo bloqueado no se ofrece en el link ni al cargar turnos. Si el día tiene turnos cargados, avisa cuántos son y pide confirmación; esos turnos no se cancelan solos.
+
+Las flechas arriba del calendario avanzan y retroceden de a 6 días hábiles.
+
+## Actualizar la base
+
+Cada vez que cambie `supabase/schema.sql`, pegalo completo de nuevo en el SQL Editor de Supabase y ejecutalo: agrega lo que falta sin borrar datos.

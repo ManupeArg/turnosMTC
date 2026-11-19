@@ -19,6 +19,22 @@ export interface Turno {
   fecha: string; // AAAA-MM-DD
   hora: string; // HH:MM
   estado: Estado;
+  /** Quién cargó el turno: el consultorio o el paciente desde el link público. */
+  origen: 'consultorio' | 'link';
+  primera_vez: boolean;
+}
+
+/** Horario o día que el profesional cerró a mano. hora = null bloquea el día completo. */
+export interface Bloqueo {
+  id: string;
+  fecha: string;
+  hora: string | null;
+}
+
+/** Lo único que ve la página pública: qué horarios no se pueden elegir (sin datos de pacientes). */
+export interface NoDisponible {
+  fecha: string;
+  hora: string | null;
 }
 
 export interface Config {
@@ -29,6 +45,7 @@ export interface Config {
 export interface Datos {
   pacientes: Paciente[];
   turnos: Turno[];
+  bloqueos: Bloqueo[];
   config: Config;
 }
 

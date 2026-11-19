@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react';
-import type { Paciente, Turno } from '../types';
+import { crearOcupado, primerLibre } from '../lib/disponibilidad';
+import type { Bloqueo, Paciente, Turno } from '../types';
 import { Modal } from './Modal';
-import { primerLibre, SelectorHorario } from './SelectorHorario';
+import { SelectorHorario } from './SelectorHorario';
 
 interface Props {
   pacientes: Paciente[];
   turnos: Turno[];
+  bloqueos: Bloqueo[];
   dias: string[];
   inicial: { fecha?: string; hora?: string; pacienteId?: string };
   onGuardar: (pacienteId: string, fecha: string, hora: string) => void;
@@ -13,12 +15,13 @@ interface Props {
   onCerrar: () => void;
 }
 
-export function AgregarTurnoModal({ pacientes, turnos, dias, inicial, onGuardar, onNuevoPaciente, onCerrar }: Props) {
+export function AgregarTurnoModal({ pacientes, turnos, bloqueos, dias, inicial, onGuardar, onNuevoPaciente, onCerrar }: Props) {
+  const ocupado = useMemo(() => crearOcupado(turnos, bloqueos), [turnos, bloqueos]);
   const fechaInicial = inicial.fecha ?? dias[0];
   const [busqueda, setBusqueda] = useState('');
   const [pacienteId, setPacienteId] = useState<string | null>(inicial.pacienteId ?? null);
   const [fecha, setFecha] = useState(fechaInicial);
-  const [hora, setHora] = useState<string | null>(inicial.hora ?? primerLibre(turnos, fechaInicial));
+  const [hora, setHora] = useState<string | null>(inicial.hora ?? primerLibre(ocupado, fechaInicial));
 
   const encontrados = useMemo(() => {
     const q = busqueda.trim().toLowerCase();
@@ -47,7 +50,7 @@ export function AgregarTurnoModal({ pacientes, turnos, dias, inicial, onGuardar,
         <button type="button" className="btn-enlace" onClick={onNuevoPaciente}>¿Viene por primera vez? Cargar nuevo paciente</button>
       </div>
 
-      <SelectorHorario dias={dias} fecha={fecha} hora={hora} turnos={turnos} onCambio={(f, h) => { setFecha(f); setHora(h); }} />
+      <SelectorHorario dias={dias} fecha={fecha} hora={hora} ocupado={ocupado} onCambio={(f, h) => { setFecha(f); setHora(h); }} />
 
       <div className="modal-pie">
         <button type="button" className="btn btn-borde" onClick={onCerrar}>Cerrar</button>

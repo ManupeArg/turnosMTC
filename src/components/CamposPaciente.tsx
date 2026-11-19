@@ -31,7 +31,15 @@ export function validarPaciente(f: FormPaciente): { datos?: DatosPaciente; error
   return { datos: { nombre, apellido, whatsapp, email: email || null, ciudad: f.ciudad.trim() || null, edad, sexo: f.sexo || null } };
 }
 
-export function CamposPaciente({ valor, onCambio, prefijo }: { valor: FormPaciente; onCambio: (f: FormPaciente) => void; prefijo: string }) {
+interface Props {
+  valor: FormPaciente;
+  onCambio: (f: FormPaciente) => void;
+  prefijo: string;
+  /** Solo nombre, apellido y WhatsApp (paciente que ya se atendió y reserva por el link). */
+  basico?: boolean;
+}
+
+export function CamposPaciente({ valor, onCambio, prefijo, basico }: Props) {
   const campo = (clave: keyof FormPaciente) => ({
     id: `${prefijo}-${clave}`,
     value: valor[clave],
@@ -52,6 +60,7 @@ export function CamposPaciente({ valor, onCambio, prefijo }: { valor: FormPacien
         <label className="etiqueta" htmlFor={`${prefijo}-whatsapp`}>WhatsApp</label>
         <input type="tel" placeholder="+54 9 385 ..." autoComplete="off" {...campo('whatsapp')} />
       </div>
+      {!basico && (<>
       <div className="campo">
         <label className="etiqueta" htmlFor={`${prefijo}-email`}>Mail <span className="opcional">(opcional)</span></label>
         <input type="email" autoComplete="off" {...campo('email')} />
@@ -73,6 +82,7 @@ export function CamposPaciente({ valor, onCambio, prefijo }: { valor: FormPacien
           </select>
         </div>
       </div>
+      </>)}
     </div>
   );
 }

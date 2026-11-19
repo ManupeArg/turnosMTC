@@ -3,7 +3,7 @@ import { AgregarTurnoModal } from './components/AgregarTurnoModal';
 import { CamposPaciente, formDesde, validarPaciente, type FormPaciente } from './components/CamposPaciente';
 import { Modal } from './components/Modal';
 import { TurnoModal } from './components/TurnoModal';
-import { MARCA } from './config';
+import { DIAS_AGENDA, MARCA } from './config';
 import * as api from './lib/datos';
 import { diaLargo, horaLinda, proximosDiasHabiles } from './lib/fechas';
 import { Calendario } from './screens/Calendario';
@@ -31,8 +31,7 @@ export default function App() {
   const [agregar, setAgregar] = useState<{ fecha?: string; hora?: string; pacienteId?: string } | null>(null);
   const [editando, setEditando] = useState<{ paciente: Paciente; form: FormPaciente; error: string } | null>(null);
 
-  const dias = useMemo(() => proximosDiasHabiles(), []);
-  const diasElegibles = useMemo(() => proximosDiasHabiles(10), []);
+  const diasElegibles = useMemo(() => proximosDiasHabiles(DIAS_AGENDA), []);
 
   const avisarError = (e: unknown) => setAviso({ texto: e instanceof Error ? e.message : 'Algo salió mal. Probá de nuevo.', error: true });
 
@@ -95,6 +94,7 @@ export default function App() {
     <div className="app">
       <nav className="menu" aria-label="Secciones">
         <div className="menu-marca">
+          <img className="menu-logo" src="/logo-blanco.png" alt="Logo DG" />
           <strong>{MARCA.consultorio}</strong>
           <span>{MARCA.profesional}</span>
         </div>
@@ -124,7 +124,8 @@ export default function App() {
         ) : pantalla === 'general' ? (
           <General datos={datos} onAbrirTurno={setTurnoId} onGuardarConfig={(c) => ejecutar(() => api.guardarConfig(c))} />
         ) : pantalla === 'calendario' ? (
-          <Calendario datos={datos} dias={dias} onAbrirTurno={setTurnoId} onAgregar={(fecha, hora) => setAgregar({ fecha, hora })} />
+          <Calendario datos={datos} onAbrirTurno={setTurnoId} onAgregar={(fecha, hora) => setAgregar({ fecha, hora })}
+            onBloquear={(fecha, hora) => ejecutar(() => api.crearBloqueo(fecha, hora))} onDesbloquear={(id) => ejecutar(() => api.quitarBloqueo(id))} />
         ) : pantalla === 'pacientes' ? (
           <Pacientes
             datos={datos}
@@ -135,7 +136,7 @@ export default function App() {
           />
         ) : (
           <NuevoPaciente
-            turnos={datos.turnos} dias={diasElegibles} config={datos.config}
+            turnos={datos.turnos} bloqueos={datos.bloqueos} dias={diasElegibles} config={datos.config}
             onGuardar={async (nuevo, t) => {
               const ok = await ejecutar(async () => {
                 const p = await api.guardarPaciente(nuevo);
@@ -153,7 +154,7 @@ export default function App() {
 
       {datos && turno && pacienteDelTurno && (
         <TurnoModal
-          turno={turno} paciente={pacienteDelTurno} turnos={datos.turnos} dias={diasElegibles} config={datos.config}
+          turno={turno} paciente={pacienteDelTurno} turnos={datos.turnos} bloqueos={datos.bloqueos} dias={diasElegibles} config={datos.config}
           onCambiar={(cambios) => ejecutar(() => api.actualizarTurno(turno.id, cambios))}
           onCancelar={async () => {
             const texto = `Turno cancelado: ${nombreDe(turno.paciente_id)}, ${diaLargo(turno.fecha)} a las ${horaLinda(turno.hora)}.`;
@@ -166,7 +167,7 @@ export default function App() {
 
       {datos && agregar && (
         <AgregarTurnoModal
-          pacientes={datos.pacientes} turnos={datos.turnos} dias={diasElegibles} inicial={agregar}
+          pacientes={datos.pacientes} turnos={datos.turnos} bloqueos={datos.bloqueos} dias={diasElegibles} inicial={agregar}
           onGuardar={async (pacienteId, fecha, hora) => {
             const ok = await ejecutar(() => api.crearTurno({ paciente_id: pacienteId, fecha, hora }),
               `Turno guardado: ${nombreDe(pacienteId)}, ${diaLargo(fecha)} a las ${horaLinda(hora)}.${recordatorio}`);

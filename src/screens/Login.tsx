@@ -23,6 +23,10 @@ export function Login({ onIngreso }: { onIngreso: (email: string) => void }) {
   return (
     <div className="login">
       <section className="login-marca">
+        <div className="login-identidad">
+          <img className="login-foto" src="/dante.jpg" alt={MARCA.profesional} width={120} height={160} />
+          <img className="login-logo" src="/logo-blanco.png" alt="Logo DG" />
+        </div>
         <div className="login-barra" aria-hidden="true" />
         <h1>{MARCA.consultorio}</h1>
         <p className="login-profesional">{MARCA.profesional}</p>

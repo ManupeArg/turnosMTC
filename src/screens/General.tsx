@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { MARCA, RUTA_RESERVA } from '../config';
 import { atiende, fechaCompleta, horaLinda, hoyIso } from '../lib/fechas';
 import { ESTADOS, ORDEN_ESTADOS, type Config, type Datos } from '../types';
 
@@ -14,6 +16,18 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
   const { config } = datos;
   const titulo = !atiende(hoy) ? 'Hoy el consultorio no atiende' : n === 0 ? 'Hoy no tenés turnos' : n === 1 ? 'Hoy tenés 1 turno' : `Hoy tenés ${n} turnos`;
   const paciente = (id: string) => datos.pacientes.find((p) => p.id === id);
+  const [copiado, setCopiado] = useState(false);
+  const link = `${window.location.origin}${RUTA_RESERVA}`;
+  const mensaje = `Hola, podés reservar tu turno en ${MARCA.consultorio} desde este link: ${link}`;
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      setCopiado(false);
+    }
+  };
 
   return (
     <div className="pantalla">
@@ -41,7 +55,7 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
               return (
                 <button key={t.id} type="button" className="fila-turno" onClick={() => onAbrirTurno(t.id)}>
                   <span className="fila-hora">{horaLinda(t.hora)}</span>
-                  <span className="fila-nombre">{p ? `${p.nombre} ${p.apellido}` : 'Paciente'}</span>
+                  <span className="fila-nombre">{p ? `${p.nombre} ${p.apellido}` : 'Paciente'}{t.primera_vez && <span className="pastilla pastilla-amarilla pastilla-junto">Primera vez</span>}</span>
                   <span className={`pastilla ${ESTADOS[t.estado].clase}`}>{ESTADOS[t.estado].marca} {ESTADOS[t.estado].nombre}</span>
                 </button>
               );
@@ -49,7 +63,18 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
           </div>
         </section>
 
-        <section className="tarjeta col-angosta">
+        <div className="col-angosta columna">
+        <section className="tarjeta">
+          <h2>Link para que el paciente reserve</h2>
+          <p className="suave">Mandalo por WhatsApp: el paciente elige día y horario entre los que están libres y el turno aparece en tu calendario.</p>
+          <input className="input-link" type="text" readOnly aria-label="Link de reserva" value={link} onFocus={(e) => e.target.select()} />
+          <div className="chips">
+            <button type="button" className="btn btn-primario" onClick={copiar}>{copiado ? 'Copiado ✓' : 'Copiar link'}</button>
+            <a className="btn btn-borde btn-link" href={`https://wa.me/?text=${encodeURIComponent(mensaje)}`} target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
+            <a className="btn btn-borde btn-link" href={RUTA_RESERVA} target="_blank" rel="noreferrer">Ver la página</a>
+          </div>
+        </section>
+        <section className="tarjeta">
           <h2>Recordatorio por WhatsApp</h2>
           <p className="suave">Se manda solo a cada paciente. Su respuesta actualiza el estado del turno.</p>
           <div className="campo">
@@ -72,6 +97,7 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
               : `Cada paciente recibe el mensaje el mismo día de su turno, a las ${config.recordatorio_hora}.`}
           </p>
         </section>
+        </div>
       </div>
     </div>
   );

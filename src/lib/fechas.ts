@@ -45,16 +45,26 @@ export const filasCalendario = () => {
 export const proximosDiasHabiles = (n = DIAS_VISIBLES) => {
   const dias: string[] = [];
   let iso = hoyIso();
-  for (let i = 0; dias.length < n && i < 60; i++) {
+  for (let i = 0; dias.length < n && i < n * 7 + 14; i++) {
     if (atiende(iso)) dias.push(iso);
     iso = sumarDias(iso, 1);
   }
   return dias;
 };
 
+/** Todos los días hábiles entre hoy y una fecha (inclusive). */
+export const diasHabilesHasta = (hasta: string) => {
+  const dias: string[] = [];
+  for (let iso = hoyIso(); iso <= hasta; iso = sumarDias(iso, 1)) if (atiende(iso)) dias.push(iso);
+  return dias;
+};
+
+/** "Lun 23/11": día corto con el mes, para elegir fechas lejanas. */
+export const diaConMes = (iso: string) => `${diaCorto(iso)}/${iso.slice(5, 7)}`;
+
 export const diaLargo = (iso: string) => {
   const d = deIso(iso);
-  return `${DIAS[d.getDay()]} ${d.getDate()}`;
+  return `${DIAS[d.getDay()]} ${d.getDate()}/${dos(d.getMonth() + 1)}`;
 };
 
 export const diaCorto = (iso: string) => {
@@ -66,6 +76,14 @@ export const fechaCompleta = (iso: string) => {
   const d = deIso(iso);
   const dia = DIAS[d.getDay()];
   return `${dia[0].toUpperCase()}${dia.slice(1)} ${d.getDate()} de ${MESES[d.getMonth()]}`;
+};
+
+/** true si ese horario ya pasó (solo puede pasar con la fecha de hoy o anteriores). */
+export const yaPaso = (iso: string, hora: string) => {
+  const ahora = new Date();
+  const hoy = aIso(ahora);
+  if (iso !== hoy) return iso < hoy;
+  return hora <= `${dos(ahora.getHours())}:${dos(ahora.getMinutes())}`;
 };
 
 /** "8:00" en vez de "08:00", para mostrar. */

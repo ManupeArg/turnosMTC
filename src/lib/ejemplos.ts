@@ -14,25 +14,25 @@ export const PACIENTES_EJEMPLO: DatosPaciente[] = [
 ];
 
 /** Turnos de ejemplo: [índice de día hábil, índice de horario, índice de paciente, estado]. */
-const PLAN: [number, number, number, Estado][] = [
+const PLAN: [number, number, number, Estado, boolean?][] = [
   [0, 0, 0, 'confirmado'], [0, 1, 1, 'confirmado'], [0, 3, 2, 'pendiente'], [0, 5, 3, 'no_viene'],
   [0, 8, 4, 'confirmado'], [0, 10, 5, 'pendiente'], [0, 13, 6, 'pendiente'],
-  [1, 0, 7, 'pendiente'], [1, 2, 0, 'confirmado'], [1, 6, 2, 'pendiente'], [1, 9, 4, 'pendiente'],
-  [2, 1, 5, 'pendiente'], [2, 4, 1, 'confirmado'], [2, 7, 3, 'pendiente'],
+  [1, 0, 7, 'pendiente', true], [1, 2, 0, 'confirmado'], [1, 6, 2, 'pendiente'], [1, 9, 4, 'pendiente'],
+  [2, 1, 5, 'pendiente', true], [2, 4, 1, 'confirmado'], [2, 7, 3, 'pendiente'],
   [3, 0, 6, 'pendiente'], [3, 3, 7, 'pendiente'],
   [4, 2, 2, 'pendiente'], [4, 5, 0, 'pendiente'],
 ];
 
 export const turnosEjemplo = () => {
   const dias = proximosDiasHabiles();
-  const turnos: { indicePaciente: number; fecha: string; hora: string; estado: Estado }[] = [];
-  for (const [d, s, p, estado] of PLAN) {
+  const turnos: { indicePaciente: number; fecha: string; hora: string; estado: Estado; origen: 'consultorio' | 'link'; primera_vez: boolean }[] = [];
+  for (const [d, s, p, estado, porLink] of PLAN) {
     const fecha = dias[d];
     if (!fecha) continue;
     const slots = slotsDe(fecha);
     const hora = slots[s % slots.length];
     if (turnos.some((t) => t.fecha === fecha && t.hora === hora)) continue;
-    turnos.push({ indicePaciente: p, fecha, hora, estado });
+    turnos.push({ indicePaciente: p, fecha, hora, estado, origen: porLink ? 'link' : 'consultorio', primera_vez: !!porLink });
   }
   return turnos;
 };

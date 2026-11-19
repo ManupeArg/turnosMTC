@@ -1,52 +1,62 @@
-import { diaCorto, horaLinda, slotsDe } from '../lib/fechas';
-import type { Turno } from '../types';
+import { useEffect, useState } from 'react';
+import { primerLibre, type Ocupado } from '../lib/disponibilidad';
+import { diaConMes, horaLinda, slotsDe } from '../lib/fechas';
 
 interface Props {
+  /** Todos los días que se pueden elegir; se muestran de a 6, con flechas para avanzar. */
   dias: string[];
   fecha: string;
   hora: string | null;
-  turnos: Turno[];
-  /** Turno que se está editando: su propio horario no cuenta como ocupado. */
-  exceptoId?: string;
+  ocupado: Ocupado;
+  /** Página pública: muestra solo los horarios libres en vez de tacharlos. */
+  soloLibres?: boolean;
   onCambio: (fecha: string, hora: string | null) => void;
 }
 
-export const estaOcupado = (turnos: Turno[], fecha: string, hora: string, exceptoId?: string) =>
-  turnos.some((t) => t.fecha === fecha && t.hora === hora && t.id !== exceptoId);
+const POR_PAGINA = 6;
 
-export const primerLibre = (turnos: Turno[], fecha: string, exceptoId?: string) =>
-  slotsDe(fecha).find((h) => !estaOcupado(turnos, fecha, h, exceptoId)) ?? null;
+export function SelectorHorario({ dias, fecha, hora, ocupado, soloLibres, onCambio }: Props) {
+  const paginaDe = (f: string) => Math.max(0, Math.floor(dias.indexOf(f) / POR_PAGINA));
+  const [pagina, setPagina] = useState(() => paginaDe(fecha));
+  const ultima = Math.max(0, Math.ceil(dias.length / POR_PAGINA) - 1);
 
-export function SelectorHorario({ dias, fecha, hora, turnos, exceptoId, onCambio }: Props) {
+  // Si cambia la lista de días (se ocupó alguno), vuelve a la página del día elegido.
+  useEffect(() => { setPagina(paginaDe(fecha)); }, [dias.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const actual = Math.min(pagina, ultima);
+  const visibles = dias.slice(actual * POR_PAGINA, actual * POR_PAGINA + POR_PAGINA);
   const elegirDia = (dia: string) => {
-    const sigue = hora && slotsDe(dia).includes(hora) && !estaOcupado(turnos, dia, hora, exceptoId);
-    onCambio(dia, sigue ? hora : primerLibre(turnos, dia, exceptoId));
+    const sigue = hora && slotsDe(dia).includes(hora) && !ocupado(dia, hora);
+    onCambio(dia, sigue ? hora : primerLibre(ocupado, dia));
   };
+  const horarios = slotsDe(fecha).filter((h) => !soloLibres || !ocupado(fecha, h));
 
   return (
     <>
       <div className="campo">
         <span className="etiqueta">Día</span>
-        <div className="chips">
-          {dias.map((d) => (
-            <button key={d} type="button" className={`chip ${d === fecha ? 'chip-activo' : ''}`} aria-pressed={d === fecha} onClick={() => elegirDia(d)}>
-              {diaCorto(d)}
-            </button>
-          ))}
+        <div className="dias-paginados">
+          <button type="button" className="btn btn-flecha" disabled={actual === 0} onClick={() => setPagina(actual - 1)} aria-label="Días anteriores">‹</button>
+          <div className="chips chips-dias">
+            {visibles.map((d) => (
+              <button key={d} type="button" className={`chip ${d === fecha ? 'chip-activo' : ''}`} aria-pressed={d === fecha} onClick={() => elegirDia(d)}>
+                {diaConMes(d)}
+              </button>
+            ))}
+          </div>
+          <button type="button" className="btn btn-flecha" disabled={actual >= ultima} onClick={() => setPagina(actual + 1)} aria-label="Días siguientes">›</button>
         </div>
       </div>
       <div className="campo">
-        <span className="etiqueta">Horario (tachados: ocupados)</span>
+        <span className="etiqueta">{soloLibres ? `Horarios disponibles el ${diaConMes(fecha)}` : `Horario del ${diaConMes(fecha)} (tachados: ocupados o bloqueados)`}</span>
         <div className="chips chips-horas">
-          {slotsDe(fecha).map((h) => {
-            const ocupado = estaOcupado(turnos, fecha, h, exceptoId);
-            return (
-              <button key={h} type="button" disabled={ocupado} className={`chip ${h === hora ? 'chip-activo' : ''}`} aria-pressed={h === hora} onClick={() => onCambio(fecha, h)}>
-                {horaLinda(h)}
-              </button>
-            );
-          })}
+          {horarios.map((h) => (
+            <button key={h} type="button" disabled={ocupado(fecha, h)} className={`chip ${h === hora ? 'chip-activo' : ''}`} aria-pressed={h === hora} onClick={() => onCambio(fecha, h)}>
+              {horaLinda(h)}
+            </button>
+          ))}
         </div>
+        {horarios.length === 0 && <p className="suave">No quedan horarios libres ese día.</p>}
       </div>
     </>
   );
