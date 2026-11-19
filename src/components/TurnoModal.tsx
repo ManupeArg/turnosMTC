@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MARCA } from '../config';
-import { diaLargo, horaLinda, horasAntes, momentoAntes } from '../lib/fechas';
+import { avisoDe, diaLargo, horaLinda, horasAntes } from '../lib/fechas';
 import { crearOcupado } from '../lib/disponibilidad';
 import { ESTADOS, ORDEN_ESTADOS, type Bloqueo, type Config, type Paciente, type Turno } from '../types';
 import { Modal } from './Modal';
@@ -20,6 +20,10 @@ interface Props {
 
 export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, onCambiar, onCancelar, onCerrar }: Props) {
   const [confirmando, setConfirmando] = useState(false);
+  const avisos = [
+    { nombre: 'Primer aviso', horas: config.recordatorio_horas_antes },
+    ...(config.recordatorio2_horas_antes != null ? [{ nombre: 'Segundo aviso', horas: config.recordatorio2_horas_antes }] : []),
+  ].map((a) => ({ ...a, ...avisoDe(turno.fecha, turno.hora, a.horas, turno.created_at) }));
   const diasConTurno = dias.includes(turno.fecha) ? dias : [turno.fecha, ...dias];
 
   return (
@@ -41,8 +45,17 @@ export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, on
         </div>
       </div>
 
+      {turno.estado === 'no_viene' && <p className="nota">Avisó que no viene: este día y horario quedó libre para que lo tome otro paciente.</p>}
+
       <div className="wa">
-        <div className="wa-titulo">Recordatorio por WhatsApp · {horasAntes(config.recordatorio_horas_antes)} (sale el {momentoAntes(turno.fecha, turno.hora, config.recordatorio_horas_antes)})</div>
+        <div className="wa-titulo">Recordatorio por WhatsApp</div>
+        <ul className="avisos">
+          {avisos.map((a) => (
+            <li key={a.nombre}>
+              <strong>{a.nombre}</strong> · {horasAntes(a.horas)}: {a.seEnvia ? `sale el ${a.cuando}` : 'no se envía, el turno se reservó con menos anticipación'}
+            </li>
+          ))}
+        </ul>
         <div className="wa-globo">
           Hola {paciente.nombre}, te recordamos tu turno en {MARCA.consultorio} el {diaLargo(turno.fecha)} a las {horaLinda(turno.hora)}. ¿Venís?
         </div>

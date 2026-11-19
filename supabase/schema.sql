@@ -108,7 +108,7 @@ $$;
 create or replace function public.horarios_no_disponibles(desde date, hasta date)
 returns table (fecha date, hora text)
 language sql stable security definer set search_path = public as $$
-  select t.fecha, t.hora from public.turnos t where t.fecha between desde and hasta
+  select t.fecha, t.hora from public.turnos t where t.fecha between desde and hasta and t.estado <> 'no_viene'
   union
   select b.fecha, b.hora from public.bloqueos b where b.fecha between desde and hasta
 $$;
@@ -119,6 +119,16 @@ alter table public.configuracion add column if not exists recordatorio_horas_ant
 alter table public.configuracion drop constraint if exists configuracion_horas_check;
 alter table public.configuracion add constraint configuracion_horas_check check (recordatorio_horas_antes between 1 and 168);
 alter table public.pacientes add column if not exists como_nos_conocio text;
+
+-- Versión 4: segundo aviso, y los turnos "no viene" liberan su día y horario.
+alter table public.configuracion add column if not exists recordatorio2_horas_antes integer default 2;
+alter table public.configuracion drop constraint if exists configuracion_horas2_check;
+alter table public.configuracion add constraint configuracion_horas2_check check (recordatorio2_horas_antes is null or recordatorio2_horas_antes between 1 and 168);
+
+-- Antes no podía haber dos turnos en el mismo día y horario. Ahora sí, siempre que a lo sumo uno esté vigente:
+-- los que avisaron que no vienen quedan guardados pero no ocupan el lugar.
+alter table public.turnos drop constraint if exists turnos_fecha_hora_key;
+create unique index if not exists turnos_horario_vigente on public.turnos (fecha, hora) where estado <> 'no_viene';
 
 -- La función de reserva cambió de parámetros: se borra la versión anterior para que no queden dos.
 drop function if exists public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text);
@@ -148,7 +158,7 @@ begin
     return 'invalido';
   end if;
   if exists (select 1 from public.bloqueos b where b.fecha = p_fecha and (b.hora is null or b.hora = p_hora))
-     or exists (select 1 from public.turnos t where t.fecha = p_fecha and t.hora = p_hora) then
+     or exists (select 1 from public.turnos t where t.fecha = p_fecha and t.hora = p_hora and t.estado <> 'no_viene') then
     return 'ocupado';
   end if;
 
@@ -162,7 +172,7 @@ begin
             nullif(trim(coalesce(p_ciudad, '')), ''), case when p_edad between 0 and 120 then p_edad end,
             nullif(trim(coalesce(p_sexo, '')), ''), nullif(trim(coalesce(p_como_nos_conocio, '')), ''))
     returning id into v_paciente;
-  elsif (select count(*) from public.turnos t where t.paciente_id = v_paciente and t.fecha >= v_hoy) >= 2 then
+  elsif (select count(*) from public.turnos t where t.paciente_id = v_paciente and t.fecha >= v_hoy and t.estado <> 'no_viene') >= 2 then
     return 'limite';
   end if;
 

@@ -97,5 +97,15 @@ export const momentoAntes = (iso: string, hora: string, horas: number) => {
   return `${diaLargo(aIso(d))} a las ${d.getHours()}:${dos(d.getMinutes())}`;
 };
 
+/** Un aviso que sale N horas antes del turno: cuándo sale y si llega a enviarse.
+ *  No se envía si el turno se cargó después de ese momento (ej: aviso de 24 hs y turno sacado 10 hs antes). */
+export const avisoDe = (iso: string, hora: string, horas: number, creado?: string) => {
+  const [h, m] = hora.split(':').map(Number);
+  const sale = deIso(iso);
+  sale.setHours(h - horas, m, 0, 0);
+  const seEnvia = !creado || new Date(creado).getTime() <= sale.getTime();
+  return { cuando: momentoAntes(iso, hora, horas), seEnvia };
+};
+
 /** "8:00" en vez de "08:00", para mostrar. */
 export const horaLinda = (hora: string) => hora.replace(/^0/, '');

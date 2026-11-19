@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { diaBloqueado, horaBloqueada } from '../lib/disponibilidad';
+import { diaBloqueado, horaBloqueada, ocupaLugar } from '../lib/disponibilidad';
 import { Modal } from '../components/Modal';
 import { DIAS_VISIBLES } from '../config';
 import { diaConMes, diaCorto, diaLargo, filasCalendario, horaLinda, hoyIso, proximosDiasHabiles, slotsDe } from '../lib/fechas';
@@ -30,8 +30,11 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
     const p = datos.pacientes.find((x) => x.id === t.paciente_id);
     return p ? `${p.nombre} ${p.apellido}` : 'Paciente';
   };
-  const turnoEn = (fecha: string, hora: string) => datos.turnos.find((t) => t.fecha === fecha && t.hora === hora);
-  const cantidad = (fecha: string) => datos.turnos.filter((t) => t.fecha === fecha).length;
+  /** El turno vigente de ese horario (los que avisaron que no vienen no ocupan lugar). */
+  const turnoEn = (fecha: string, hora: string) => datos.turnos.find((t) => ocupaLugar(t) && t.fecha === fecha && t.hora === hora);
+  /** Turnos de ese horario cuyo paciente avisó que no viene: el lugar quedó libre. */
+  const noVienenEn = (fecha: string, hora: string) => datos.turnos.filter((t) => !ocupaLugar(t) && t.fecha === fecha && t.hora === hora);
+  const cantidad = (fecha: string) => datos.turnos.filter((t) => ocupaLugar(t) && t.fecha === fecha).length;
   const textoCantidad = (c: number) => (c === 0 ? 'Sin turnos' : c === 1 ? '1 turno' : `${c} turnos`);
   const diasCerrados = bloqueos.filter((b) => b.hora === null).sort((a, b) => a.fecha.localeCompare(b.fecha));
 
@@ -133,30 +136,38 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
           {slotsDe(dia).map((h) => {
             const t = turnoEn(dia, h);
             const b = horaBloqueada(bloqueos, dia, h);
-            if (t) return (
-              <button key={h} type="button" className={`agenda-fila ${ESTADOS[t.estado].clase}`} onClick={() => onAbrirTurno(t.id)}>
+            const cancelados = noVienenEn(dia, h).map((c) => (
+              <button key={c.id} type="button" className={`agenda-fila agenda-cancelado ${ESTADOS[c.estado].clase}`} onClick={() => onAbrirTurno(c.id)}>
+                <span className="fila-hora">{horaLinda(h)}</span>
+                <span className="agenda-texto"><strong>{nombre(c)}</strong><span>{ESTADOS[c.estado].marca} {ESTADOS[c.estado].nombre} · horario liberado</span></span>
+              </button>
+            ));
+            let fila;
+            if (t) fila = (
+              <button type="button" className={`agenda-fila ${ESTADOS[t.estado].clase}`} onClick={() => onAbrirTurno(t.id)}>
                 <span className="fila-hora">{horaLinda(h)}</span>
                 <span className="agenda-texto"><strong>{nombre(t)}</strong><span>{ESTADOS[t.estado].marca} {ESTADOS[t.estado].nombre}{t.primera_vez ? ' · Primera vez' : ''}</span></span>
               </button>
             );
-            if (cerrado) return (
-              <div key={h} className="agenda-fila agenda-bloqueada">
+            else if (cerrado) fila = (
+              <div className="agenda-fila agenda-bloqueada">
                 <span className="fila-hora">{horaLinda(h)}</span>
                 <span className="agenda-texto"><span>Bloqueado</span></span>
               </div>
             );
-            if (b) return (
-              <button key={h} type="button" className="agenda-fila agenda-bloqueada" disabled={!modoBloqueo} onClick={() => onDesbloquear(b.id)}>
+            else if (b) fila = (
+              <button type="button" className="agenda-fila agenda-bloqueada" disabled={!modoBloqueo} onClick={() => onDesbloquear(b.id)}>
                 <span className="fila-hora">{horaLinda(h)}</span>
                 <span className="agenda-texto"><span>{modoBloqueo ? 'Bloqueado · tocá para liberar' : 'Bloqueado'}</span></span>
               </button>
             );
-            return (
-              <button key={h} type="button" className="agenda-fila agenda-libre" onClick={() => (modoBloqueo ? onBloquear(dia, h) : onAgregar(dia, h))}>
+            else fila = (
+              <button type="button" className="agenda-fila agenda-libre" onClick={() => (modoBloqueo ? onBloquear(dia, h) : onAgregar(dia, h))}>
                 <span className="fila-hora">{horaLinda(h)}</span>
                 <span className="agenda-texto"><span>{modoBloqueo ? 'Libre · tocá para bloquear' : 'Libre · + Agregar turno'}</span></span>
               </button>
             );
+            return <div key={h} className="agenda-grupo">{cancelados}{fila}</div>;
           })}
         </div>
       </div>
@@ -208,7 +219,19 @@ export function Calendario({ datos, onAbrirTurno, onAgregar, onBloquear, onDesbl
                   } else {
                     contenido = <button type="button" className="cal-libre" onClick={() => onAgregar(d, h)} aria-label={`Agregar turno el ${diaLargo(d)} a las ${horaLinda(h)}`}>+ Turno</button>;
                   }
-                  return <div key={d} className={`cal-celda ${corte ? 'cal-corte' : ''} ${h.endsWith(':00') ? 'cal-en-punto' : ''}`}>{contenido}</div>;
+                  const cancelado = abierto ? noVienenEn(d, h)[0] : undefined;
+                  return (
+                    <div key={d} className={`cal-celda ${cancelado ? 'cal-celda-doble' : ''} ${corte ? 'cal-corte' : ''} ${h.endsWith(':00') ? 'cal-en-punto' : ''}`}>
+                      {cancelado && (
+                        <button type="button" className={`cal-turno cal-cancelado ${ESTADOS[cancelado.estado].clase}`} onClick={() => onAbrirTurno(cancelado.id)}
+                          aria-label={`${nombre(cancelado)} avisó que no viene el ${diaLargo(d)} a las ${horaLinda(h)}. Horario liberado.`} title={`${nombre(cancelado)}: no viene`}>
+                          <span aria-hidden="true">✕</span>
+                          {!t && <span className="cal-turno-nombre">{nombre(cancelado)}</span>}
+                        </button>
+                      )}
+                      {contenido}
+                    </div>
+                  );
                 })}
               </div>
             );

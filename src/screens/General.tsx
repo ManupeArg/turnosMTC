@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { MARCA, RUTA_RESERVA } from '../config';
 import { atiende, fechaCompleta, horaLinda, horasAntes, hoyIso } from '../lib/fechas';
 import { ESTADOS, HORAS_RECORDATORIO, ORDEN_ESTADOS, type Config, type Datos } from '../types';
@@ -16,9 +16,10 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
   const { config } = datos;
   const titulo = !atiende(hoy) ? 'Hoy el consultorio no atiende' : n === 0 ? 'Hoy no tenés turnos' : n === 1 ? 'Hoy tenés 1 turno' : `Hoy tenés ${n} turnos`;
   const paciente = (id: string) => datos.pacientes.find((p) => p.id === id);
-  const horas = config.recordatorio_horas_antes;
-  const [horasTexto, setHorasTexto] = useState(String(horas));
-  useEffect(() => setHorasTexto(String(horas)), [horas]);
+  const primero = config.recordatorio_horas_antes;
+  const segundo = config.recordatorio2_horas_antes;
+  /** Las opciones fijas, más el valor guardado si era otro (por ejemplo de una versión anterior). */
+  const opciones = (actual: number | null) => (actual != null && !HORAS_RECORDATORIO.includes(actual) ? [...HORAS_RECORDATORIO, actual].sort((a, b) => a - b) : HORAS_RECORDATORIO);
   const [copiado, setCopiado] = useState(false);
   const link = `${window.location.origin}${RUTA_RESERVA}`;
   const mensaje = `Hola, podés reservar tu turno en ${MARCA.consultorio} desde este link: ${link}`;
@@ -81,25 +82,20 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
           <h2>Recordatorio por WhatsApp</h2>
           <p className="suave">Se manda solo a cada paciente. Su respuesta actualiza el estado del turno.</p>
           <div className="campo">
-            <span className="etiqueta">Cuánto antes de cada turno se envía</span>
-            <div className="chips">
-              {HORAS_RECORDATORIO.map((h) => (
-                <button key={h} type="button" aria-pressed={horas === h} className={`chip ${horas === h ? 'chip-activo' : ''}`} onClick={() => onGuardarConfig({ recordatorio_horas_antes: h })}>
-                  {h} hs
-                </button>
-              ))}
-            </div>
+            <label className="etiqueta" htmlFor="aviso-1">Primer aviso</label>
+            <select id="aviso-1" value={primero} onChange={(e) => onGuardarConfig({ ...config, recordatorio_horas_antes: Number(e.target.value) })}>
+              {opciones(primero).map((h) => <option key={h} value={h}>{horasAntes(h)}</option>)}
+            </select>
           </div>
           <div className="campo">
-            <label className="etiqueta" htmlFor="horas-recordatorio">Otra cantidad de horas (de 1 a 168)</label>
-            <input id="horas-recordatorio" className="input-hora" type="number" min={1} max={168} step={1} value={horasTexto}
-              onChange={(e) => {
-                setHorasTexto(e.target.value);
-                const n = Number(e.target.value);
-                if (Number.isInteger(n) && n >= 1 && n <= 168 && n !== horas) onGuardarConfig({ recordatorio_horas_antes: n });
-              }} />
+            <label className="etiqueta" htmlFor="aviso-2">Segundo aviso</label>
+            <select id="aviso-2" value={segundo ?? ''} onChange={(e) => onGuardarConfig({ ...config, recordatorio2_horas_antes: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">No enviar segundo aviso</option>
+              {opciones(segundo).map((h) => <option key={h} value={h}>{horasAntes(h)}</option>)}
+            </select>
           </div>
-          <p className="nota">Cada paciente recibe el mensaje {horasAntes(horas)} de su turno. En cada turno vas a ver el día y la hora exactos en que sale.</p>
+          {segundo != null && segundo >= primero && <p className="error">El segundo aviso debería salir más cerca del turno que el primero. Elegí menos horas.</p>}
+          <p className="nota">Si un turno se reserva con menos anticipación que un aviso, ese aviso ya no se envía. Por ejemplo: con un aviso de 24 horas antes y un turno sacado 10 horas antes, ese aviso no sale.</p>
         </section>
         </div>
       </div>

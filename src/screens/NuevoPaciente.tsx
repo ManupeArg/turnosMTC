@@ -49,7 +49,7 @@ export function NuevoPaciente({ turnos, bloqueos, dias, config, onGuardar }: Pro
         {error && <p className="error" role="alert">{error}</p>}
         <div className="formulario-pie">
           <button className="btn btn-primario btn-grande" disabled={guardando}>{conTurno ? 'Guardar paciente y turno' : 'Guardar paciente'}</button>
-          {conTurno && <span className="suave chico">El recordatorio por WhatsApp sale {horasAntes(config.recordatorio_horas_antes)} del turno.</span>}
+          {conTurno && <span className="suave chico">Avisos por WhatsApp: {[config.recordatorio_horas_antes, config.recordatorio2_horas_antes].filter((h): h is number => h != null).map(horasAntes).join(' y ')}.</span>}
         </div>
       </form>
     </div>

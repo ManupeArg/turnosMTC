@@ -57,10 +57,10 @@ Alternativa sin GitHub: `npx vercel` desde esta carpeta.
 
 ## Qué falta: WhatsApp real
 
-Hoy el recordatorio se **configura** (cuántas horas antes de cada turno) y la respuesta del paciente se **simula** con los botones "Sí, confirmo" / "No puedo ir" dentro de cada turno. Para que sea real hace falta:
+Hoy los avisos se **configuran** (primer y segundo aviso, cada uno tantas horas antes del turno; si el turno se reserva con menos anticipación, ese aviso no sale) y la respuesta del paciente se **simula** con los botones "Sí, confirmo" / "No puedo ir" dentro de cada turno. Para que sea real hace falta:
 
 - Cuenta de WhatsApp Business Platform (Meta) con una plantilla de recordatorio aprobada y botones de respuesta rápida.
-- Una tarea programada (cada 15 o 30 minutos) que lea `configuracion.recordatorio_horas_antes` y envíe la plantilla a los turnos que estén a esa cantidad de horas.
+- Una tarea programada (cada 15 o 30 minutos) que lea `configuracion.recordatorio_horas_antes` y `recordatorio2_horas_antes`, compare con `turnos.created_at` y envíe la plantilla a los turnos que estén a esa cantidad de horas.
 - Un webhook que reciba la respuesta y actualice `turnos.estado`.
 
 Las dos últimas se pueden hacer con funciones de Vercel o de Supabase sin cambiar el resto de la app.
@@ -87,3 +87,7 @@ Las flechas arriba del calendario avanzan y retroceden de a 6 días hábiles.
 ## Actualizar la base
 
 Cada vez que cambie `supabase/schema.sql`, pegalo completo de nuevo en el SQL Editor de Supabase y ejecutalo: agrega lo que falta sin borrar datos.
+
+## Cuando un paciente avisa que no viene
+
+El turno queda guardado como "No viene" pero deja de ocupar el lugar: ese día y horario vuelve a ofrecerse en el link y en la agenda. Si otro paciente lo toma, el calendario muestra al nuevo y una ✕ roja al lado para abrir el turno que se cayó. Un turno "No viene" no se puede volver a confirmar si el horario ya lo tomó otra persona.

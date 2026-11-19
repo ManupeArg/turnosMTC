@@ -269,3 +269,15 @@ button.cal-bloqueado:hover { background: #3a3d41; }
 .cal-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .cal-rango { font-family: var(--titulos); font-weight: 600; font-size: 17px; }
 .btn-whatsapp { justify-content: center; background: var(--blanco); }
+
+/* Turnos de quienes avisaron que no vienen: el horario queda libre */
+.cal-celda-doble { display: flex; gap: 2px; }
+.cal-celda-doble > * { min-width: 0; }
+.cal-celda-doble .cal-cancelado { flex: 1 1 0; }
+.cal-celda-doble .cal-libre { flex: 0 0 34px; opacity: 1; font-size: 0; }
+.cal-celda-doble .cal-libre::before { content: '+'; font-size: 18px; }
+.cal-celda-doble .cal-turno:not(.cal-cancelado) { flex: 1 1 0; }
+.cal-celda-doble .cal-turno:not(.cal-cancelado) ~ .cal-cancelado, .cal-celda-doble .cal-cancelado:has(~ .cal-turno) { flex: 0 0 26px; padding: 0; justify-content: center; }
+.agenda-grupo { display: flex; flex-direction: column; gap: 4px; }
+.agenda-cancelado { min-height: 46px; opacity: 0.9; }
+.avisos { margin: 0; padding-left: 18px; font-size: 14px; display: flex; flex-direction: column; gap: 4px; }

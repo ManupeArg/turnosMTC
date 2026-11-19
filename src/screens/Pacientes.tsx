@@ -18,7 +18,7 @@ export function Pacientes({ datos, onEditar, onAgendar, onNuevo, onCargarEjemplo
     .sort((a, b) => a.apellido.localeCompare(b.apellido));
 
   const proximo = (id: string) => {
-    const t = datos.turnos.filter((x) => x.paciente_id === id).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))[0];
+    const t = datos.turnos.filter((x) => x.paciente_id === id && x.estado !== 'no_viene').sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))[0];
     return t ? `Próximo turno: ${diaLargo(t.fecha)} · ${horaLinda(t.hora)}` : 'Sin turnos próximos';
   };
   const detalle = (p: Paciente) => [p.ciudad, p.edad != null ? `${p.edad} años` : null, p.sexo, p.como_nos_conocio ? `Nos conoció por: ${p.como_nos_conocio.toLowerCase()}` : null].filter(Boolean).join(' · ');

@@ -24,6 +24,8 @@ export interface Turno {
   /** Quién cargó el turno: el consultorio o el paciente desde el link público. */
   origen: 'consultorio' | 'link';
   primera_vez: boolean;
+  /** Cuándo se cargó el turno (fecha y hora ISO). Define si llega a salir cada aviso. */
+  created_at?: string;
 }
 
 /** Horario o día que el profesional cerró a mano. hora = null bloquea el día completo. */
@@ -40,8 +42,10 @@ export interface NoDisponible {
 }
 
 export interface Config {
-  /** Cuántas horas antes de cada turno se envía el recordatorio por WhatsApp. */
+  /** Primer aviso por WhatsApp: cuántas horas antes de cada turno se envía. */
   recordatorio_horas_antes: number;
+  /** Segundo aviso: horas antes del turno, o null si no se envía. */
+  recordatorio2_horas_antes: number | null;
 }
 
 export interface Datos {
@@ -64,4 +68,4 @@ export const SEXOS = ['Femenino', 'Masculino', 'Otro'];
 export const COMO_NOS_CONOCIO = ['Red social', 'Recomendación', 'Otro'];
 
 /** Opciones rápidas para el recordatorio (horas antes del turno). */
-export const HORAS_RECORDATORIO = [2, 4, 12, 24, 48];
+export const HORAS_RECORDATORIO = [1, 2, 3, 4, 12, 24, 48];
