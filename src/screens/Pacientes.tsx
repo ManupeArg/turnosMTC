@@ -21,7 +21,7 @@ export function Pacientes({ datos, onEditar, onAgendar, onNuevo, onCargarEjemplo
     const t = datos.turnos.filter((x) => x.paciente_id === id).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora))[0];
     return t ? `Próximo turno: ${diaLargo(t.fecha)} · ${horaLinda(t.hora)}` : 'Sin turnos próximos';
   };
-  const detalle = (p: Paciente) => [p.ciudad, p.edad != null ? `${p.edad} años` : null, p.sexo].filter(Boolean).join(' · ');
+  const detalle = (p: Paciente) => [p.ciudad, p.edad != null ? `${p.edad} años` : null, p.sexo, p.como_nos_conocio ? `Nos conoció por: ${p.como_nos_conocio.toLowerCase()}` : null].filter(Boolean).join(' · ');
   const total = datos.pacientes.length;
 
   return (

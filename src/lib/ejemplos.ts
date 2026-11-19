@@ -3,14 +3,14 @@ import { proximosDiasHabiles, slotsDe } from './fechas';
 
 // Pacientes ficticios para mostrar la app. No son personas reales.
 export const PACIENTES_EJEMPLO: DatosPaciente[] = [
-  { nombre: 'Lucía', apellido: 'Fernández', whatsapp: '+54 9 385 555-0101', email: 'lucia.fernandez@example.com', ciudad: 'Santiago del Estero', edad: 34, sexo: 'Femenino' },
-  { nombre: 'Martín', apellido: 'Acosta', whatsapp: '+54 9 385 555-0102', email: null, ciudad: 'La Banda', edad: 47, sexo: 'Masculino' },
-  { nombre: 'Carolina', apellido: 'Ruiz', whatsapp: '+54 9 385 555-0103', email: 'caro.ruiz@example.com', ciudad: 'Santiago del Estero', edad: 29, sexo: 'Femenino' },
-  { nombre: 'Joaquín', apellido: 'Paz', whatsapp: '+54 9 385 555-0104', email: null, ciudad: 'Santiago del Estero', edad: 52, sexo: 'Masculino' },
-  { nombre: 'Valentina', apellido: 'Sosa', whatsapp: '+54 9 385 555-0105', email: null, ciudad: 'Termas de Río Hondo', edad: 41, sexo: 'Femenino' },
-  { nombre: 'Diego', apellido: 'Herrera', whatsapp: '+54 9 385 555-0106', email: 'dherrera@example.com', ciudad: 'La Banda', edad: 38, sexo: 'Masculino' },
-  { nombre: 'Florencia', apellido: 'Gómez', whatsapp: '+54 9 385 555-0107', email: null, ciudad: 'Santiago del Estero', edad: 26, sexo: 'Femenino' },
-  { nombre: 'Tomás', apellido: 'Ledesma', whatsapp: '+54 9 385 555-0108', email: null, ciudad: 'Santiago del Estero', edad: 63, sexo: 'Masculino' },
+  { nombre: 'Lucía', apellido: 'Fernández', whatsapp: '+54 9 385 555-0101', email: 'lucia.fernandez@example.com', ciudad: 'Santiago del Estero', edad: 34, sexo: 'Femenino', como_nos_conocio: 'Recomendación' },
+  { nombre: 'Martín', apellido: 'Acosta', whatsapp: '+54 9 385 555-0102', email: null, ciudad: 'La Banda', edad: 47, sexo: 'Masculino', como_nos_conocio: 'Red social' },
+  { nombre: 'Carolina', apellido: 'Ruiz', whatsapp: '+54 9 385 555-0103', email: 'caro.ruiz@example.com', ciudad: 'Santiago del Estero', edad: 29, sexo: 'Femenino', como_nos_conocio: 'Red social' },
+  { nombre: 'Joaquín', apellido: 'Paz', whatsapp: '+54 9 385 555-0104', email: null, ciudad: 'Santiago del Estero', edad: 52, sexo: 'Masculino', como_nos_conocio: 'Recomendación' },
+  { nombre: 'Valentina', apellido: 'Sosa', whatsapp: '+54 9 385 555-0105', email: null, ciudad: 'Termas de Río Hondo', edad: 41, sexo: 'Femenino', como_nos_conocio: 'Otro' },
+  { nombre: 'Diego', apellido: 'Herrera', whatsapp: '+54 9 385 555-0106', email: 'dherrera@example.com', ciudad: 'La Banda', edad: 38, sexo: 'Masculino', como_nos_conocio: null },
+  { nombre: 'Florencia', apellido: 'Gómez', whatsapp: '+54 9 385 555-0107', email: null, ciudad: 'Santiago del Estero', edad: 26, sexo: 'Femenino', como_nos_conocio: 'Red social' },
+  { nombre: 'Tomás', apellido: 'Ledesma', whatsapp: '+54 9 385 555-0108', email: null, ciudad: 'Santiago del Estero', edad: 63, sexo: 'Masculino', como_nos_conocio: 'Recomendación' },
 ];
 
 /** Turnos de ejemplo: [índice de día hábil, índice de horario, índice de paciente, estado]. */

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MARCA } from '../config';
-import { diaLargo, horaLinda } from '../lib/fechas';
+import { diaLargo, horaLinda, horasAntes, momentoAntes } from '../lib/fechas';
 import { crearOcupado } from '../lib/disponibilidad';
 import { ESTADOS, ORDEN_ESTADOS, type Bloqueo, type Config, type Paciente, type Turno } from '../types';
 import { Modal } from './Modal';
@@ -21,7 +21,6 @@ interface Props {
 export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, onCambiar, onCancelar, onCerrar }: Props) {
   const [confirmando, setConfirmando] = useState(false);
   const diasConTurno = dias.includes(turno.fecha) ? dias : [turno.fecha, ...dias];
-  const cuando = config.recordatorio_cuando === 'dia_anterior' ? 'el día anterior' : 'el mismo día';
 
   return (
     <Modal titulo={`${paciente.nombre} ${paciente.apellido}`} subtitulo={`${diaLargo(turno.fecha)} · ${horaLinda(turno.hora)} · ${paciente.whatsapp}`} onCerrar={onCerrar}>
@@ -43,7 +42,7 @@ export function TurnoModal({ turno, paciente, turnos, bloqueos, dias, config, on
       </div>
 
       <div className="wa">
-        <div className="wa-titulo">Recordatorio por WhatsApp · se envía {cuando} a las {config.recordatorio_hora}</div>
+        <div className="wa-titulo">Recordatorio por WhatsApp · {horasAntes(config.recordatorio_horas_antes)} (sale el {momentoAntes(turno.fecha, turno.hora, config.recordatorio_horas_antes)})</div>
         <div className="wa-globo">
           Hola {paciente.nombre}, te recordamos tu turno en {MARCA.consultorio} el {diaLargo(turno.fecha)} a las {horaLinda(turno.hora)}. ¿Venís?
         </div>

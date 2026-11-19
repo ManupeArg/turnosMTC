@@ -9,6 +9,8 @@ export interface Paciente {
   ciudad: string | null;
   edad: number | null;
   sexo: string | null;
+  /** Cómo conoció el consultorio: 'Red social', 'Recomendación' u 'Otro'. */
+  como_nos_conocio: string | null;
 }
 
 export type DatosPaciente = Omit<Paciente, 'id'>;
@@ -38,8 +40,8 @@ export interface NoDisponible {
 }
 
 export interface Config {
-  recordatorio_cuando: 'dia_anterior' | 'mismo_dia';
-  recordatorio_hora: string; // HH:MM
+  /** Cuántas horas antes de cada turno se envía el recordatorio por WhatsApp. */
+  recordatorio_horas_antes: number;
 }
 
 export interface Datos {
@@ -58,3 +60,8 @@ export const ESTADOS: Record<Estado, { nombre: string; marca: string; clase: str
 export const ORDEN_ESTADOS: Estado[] = ['confirmado', 'pendiente', 'no_viene'];
 
 export const SEXOS = ['Femenino', 'Masculino', 'Otro'];
+
+export const COMO_NOS_CONOCIO = ['Red social', 'Recomendación', 'Otro'];
+
+/** Opciones rápidas para el recordatorio (horas antes del turno). */
+export const HORAS_RECORDATORIO = [2, 4, 12, 24, 48];

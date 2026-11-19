@@ -113,12 +113,22 @@ language sql stable security definer set search_path = public as $$
   select b.fecha, b.hora from public.bloqueos b where b.fecha between desde and hasta
 $$;
 
+-- Versión 3: el recordatorio se configura en horas antes del turno, y se guarda cómo nos conoció el paciente.
+-- (Las columnas viejas recordatorio_cuando y recordatorio_hora quedan sin uso; no molestan.)
+alter table public.configuracion add column if not exists recordatorio_horas_antes integer not null default 24;
+alter table public.configuracion drop constraint if exists configuracion_horas_check;
+alter table public.configuracion add constraint configuracion_horas_check check (recordatorio_horas_antes between 1 and 168);
+alter table public.pacientes add column if not exists como_nos_conocio text;
+
+-- La función de reserva cambió de parámetros: se borra la versión anterior para que no queden dos.
+drop function if exists public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text);
+
 -- Reserva desde el link. Devuelve 'ok', 'ocupado', 'limite' o 'invalido'.
 -- Reconoce al paciente por los últimos 10 dígitos del WhatsApp; si no existe, lo crea.
 create or replace function public.reservar_turno(
   p_nombre text, p_apellido text, p_whatsapp text, p_fecha date, p_hora text,
   p_primera_vez boolean default false, p_email text default null, p_ciudad text default null,
-  p_edad integer default null, p_sexo text default null
+  p_edad integer default null, p_sexo text default null, p_como_nos_conocio text default null
 ) returns text
 language plpgsql security definer set search_path = public as $$
 declare
@@ -129,7 +139,8 @@ declare
 begin
   if length(trim(coalesce(p_nombre, ''))) < 2 or length(trim(coalesce(p_apellido, ''))) < 2 or length(v_digitos) < 8
      or length(p_nombre) > 80 or length(p_apellido) > 80 or length(p_whatsapp) > 30
-     or length(coalesce(p_email, '')) > 120 or length(coalesce(p_ciudad, '')) > 80 or length(coalesce(p_sexo, '')) > 20 then
+     or length(coalesce(p_email, '')) > 120 or length(coalesce(p_ciudad, '')) > 80 or length(coalesce(p_sexo, '')) > 20
+     or length(coalesce(p_como_nos_conocio, '')) > 40 then
     return 'invalido';
   end if;
   if p_fecha < v_hoy or p_fecha > v_hoy + 365 or not public.horario_de_atencion(p_fecha, p_hora)
@@ -146,10 +157,10 @@ begin
    order by p.created_at limit 1;
 
   if v_paciente is null then
-    insert into public.pacientes (nombre, apellido, whatsapp, email, ciudad, edad, sexo)
+    insert into public.pacientes (nombre, apellido, whatsapp, email, ciudad, edad, sexo, como_nos_conocio)
     values (trim(p_nombre), trim(p_apellido), trim(p_whatsapp), nullif(trim(coalesce(p_email, '')), ''),
             nullif(trim(coalesce(p_ciudad, '')), ''), case when p_edad between 0 and 120 then p_edad end,
-            nullif(trim(coalesce(p_sexo, '')), ''))
+            nullif(trim(coalesce(p_sexo, '')), ''), nullif(trim(coalesce(p_como_nos_conocio, '')), ''))
     returning id into v_paciente;
   elsif (select count(*) from public.turnos t where t.paciente_id = v_paciente and t.fecha >= v_hoy) >= 2 then
     return 'limite';
@@ -167,9 +178,9 @@ $$;
 
 -- La página pública (rol anon) solo puede usar estas dos funciones; las tablas siguen cerradas.
 revoke all on function public.horarios_no_disponibles(date, date) from public;
-revoke all on function public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text) from public;
+revoke all on function public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text, text) from public;
 grant execute on function public.horarios_no_disponibles(date, date) to anon, authenticated;
-grant execute on function public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text) to anon, authenticated;
+grant execute on function public.reservar_turno(text, text, text, date, text, boolean, text, text, integer, text, text) to anon, authenticated;
 
 -- Avisa a la API de Supabase que hay tablas y funciones nuevas.
 notify pgrst, 'reload schema';

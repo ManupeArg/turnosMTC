@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MARCA, RUTA_RESERVA } from '../config';
-import { atiende, fechaCompleta, horaLinda, hoyIso } from '../lib/fechas';
-import { ESTADOS, ORDEN_ESTADOS, type Config, type Datos } from '../types';
+import { atiende, fechaCompleta, horaLinda, horasAntes, hoyIso } from '../lib/fechas';
+import { ESTADOS, HORAS_RECORDATORIO, ORDEN_ESTADOS, type Config, type Datos } from '../types';
 
 interface Props {
   datos: Datos;
@@ -16,6 +16,9 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
   const { config } = datos;
   const titulo = !atiende(hoy) ? 'Hoy el consultorio no atiende' : n === 0 ? 'Hoy no tenés turnos' : n === 1 ? 'Hoy tenés 1 turno' : `Hoy tenés ${n} turnos`;
   const paciente = (id: string) => datos.pacientes.find((p) => p.id === id);
+  const horas = config.recordatorio_horas_antes;
+  const [horasTexto, setHorasTexto] = useState(String(horas));
+  useEffect(() => setHorasTexto(String(horas)), [horas]);
   const [copiado, setCopiado] = useState(false);
   const link = `${window.location.origin}${RUTA_RESERVA}`;
   const mensaje = `Hola, podés reservar tu turno en ${MARCA.consultorio} desde este link: ${link}`;
@@ -78,24 +81,25 @@ export function General({ datos, onAbrirTurno, onGuardarConfig }: Props) {
           <h2>Recordatorio por WhatsApp</h2>
           <p className="suave">Se manda solo a cada paciente. Su respuesta actualiza el estado del turno.</p>
           <div className="campo">
-            <span className="etiqueta">Cuándo se envía</span>
+            <span className="etiqueta">Cuánto antes de cada turno se envía</span>
             <div className="chips">
-              <button type="button" aria-pressed={config.recordatorio_cuando === 'dia_anterior'} className={`chip ${config.recordatorio_cuando === 'dia_anterior' ? 'chip-activo' : ''}`}
-                onClick={() => onGuardarConfig({ recordatorio_cuando: 'dia_anterior', recordatorio_hora: '18:00' })}>El día anterior</button>
-              <button type="button" aria-pressed={config.recordatorio_cuando === 'mismo_dia'} className={`chip ${config.recordatorio_cuando === 'mismo_dia' ? 'chip-activo' : ''}`}
-                onClick={() => onGuardarConfig({ recordatorio_cuando: 'mismo_dia', recordatorio_hora: '07:00' })}>El mismo día</button>
+              {HORAS_RECORDATORIO.map((h) => (
+                <button key={h} type="button" aria-pressed={horas === h} className={`chip ${horas === h ? 'chip-activo' : ''}`} onClick={() => onGuardarConfig({ recordatorio_horas_antes: h })}>
+                  {h} hs
+                </button>
+              ))}
             </div>
           </div>
           <div className="campo">
-            <label className="etiqueta" htmlFor="hora-recordatorio">Hora de envío</label>
-            <input id="hora-recordatorio" className="input-hora" type="time" value={config.recordatorio_hora}
-              onChange={(e) => e.target.value && onGuardarConfig({ ...config, recordatorio_hora: e.target.value })} />
+            <label className="etiqueta" htmlFor="horas-recordatorio">Otra cantidad de horas (de 1 a 168)</label>
+            <input id="horas-recordatorio" className="input-hora" type="number" min={1} max={168} step={1} value={horasTexto}
+              onChange={(e) => {
+                setHorasTexto(e.target.value);
+                const n = Number(e.target.value);
+                if (Number.isInteger(n) && n >= 1 && n <= 168 && n !== horas) onGuardarConfig({ recordatorio_horas_antes: n });
+              }} />
           </div>
-          <p className="nota">
-            {config.recordatorio_cuando === 'dia_anterior'
-              ? `Los pacientes con turno mañana reciben el mensaje hoy a las ${config.recordatorio_hora}.`
-              : `Cada paciente recibe el mensaje el mismo día de su turno, a las ${config.recordatorio_hora}.`}
-          </p>
+          <p className="nota">Cada paciente recibe el mensaje {horasAntes(horas)} de su turno. En cada turno vas a ver el día y la hora exactos en que sale.</p>
         </section>
         </div>
       </div>

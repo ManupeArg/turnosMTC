@@ -8,7 +8,7 @@ import { supabase } from './supabase';
 
 export const MODO_DEMO = !supabase;
 
-const CONFIG_INICIAL: Config = { recordatorio_cuando: 'dia_anterior', recordatorio_hora: '18:00' };
+const CONFIG_INICIAL: Config = { recordatorio_horas_antes: 24 };
 const HORARIO_OCUPADO = 'Ese horario ya está ocupado. Elegí otro.';
 
 const fallar = (error: { message: string; code?: string } | null) => {
@@ -19,7 +19,7 @@ const fallar = (error: { message: string; code?: string } | null) => {
 
 // ---------- Modo demo (localStorage) ----------
 
-const CLAVE = 'turnos-demo-v2';
+const CLAVE = 'turnos-demo-v3';
 const CLAVE_SESION = 'turnos-demo-sesion';
 const nuevoId = () => (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
 
@@ -90,12 +90,12 @@ export async function salir(): Promise<void> {
 export async function cargarTodo(): Promise<Datos> {
   if (!supabase) return leerLocal();
   const [pacientes, turnos, bloqueos, config] = await Promise.all([
-    supabase.from('pacientes').select('id,nombre,apellido,whatsapp,email,ciudad,edad,sexo').order('apellido'),
+    supabase.from('pacientes').select('id,nombre,apellido,whatsapp,email,ciudad,edad,sexo,como_nos_conocio').order('apellido'),
     supabase.from('turnos').select('id,paciente_id,fecha,hora,estado,origen,primera_vez').gte('fecha', hoyIso()).order('fecha').order('hora'),
     supabase.from('bloqueos').select('id,fecha,hora').gte('fecha', hoyIso()).order('fecha'),
-    supabase.from('configuracion').select('recordatorio_cuando,recordatorio_hora').eq('id', 1).maybeSingle(),
+    supabase.from('configuracion').select('recordatorio_horas_antes').eq('id', 1).maybeSingle(),
   ]);
-  if (turnos.error?.code === '42703' || bloqueos.error?.code === '42P01' || bloqueos.error?.code === 'PGRST205') {
+  if (turnos.error?.code === '42703' || pacientes.error?.code === '42703' || config.error?.code === '42703' || bloqueos.error?.code === '42P01' || bloqueos.error?.code === 'PGRST205') {
     throw new Error('La base de datos está desactualizada: ejecutá de nuevo supabase/schema.sql en el SQL Editor de Supabase.');
   }
   fallar(pacientes.error);
@@ -229,7 +229,7 @@ export async function reservarTurno(p: PedidoReserva): Promise<ResultadoReserva>
     if (todo.bloqueos.some((b) => b.fecha === p.fecha && (b.hora === null || b.hora === p.hora))) return 'ocupado';
     let paciente = todo.pacientes.find((x) => ultimosDigitos(x.whatsapp) === ultimosDigitos(p.whatsapp));
     if (!paciente) {
-      paciente = { id: nuevoId(), nombre: p.nombre, apellido: p.apellido, whatsapp: p.whatsapp, email: p.email, ciudad: p.ciudad, edad: p.edad, sexo: p.sexo };
+      paciente = { id: nuevoId(), nombre: p.nombre, apellido: p.apellido, whatsapp: p.whatsapp, email: p.email, ciudad: p.ciudad, edad: p.edad, sexo: p.sexo, como_nos_conocio: p.como_nos_conocio };
       todo.pacientes.push(paciente);
     } else if (todo.turnos.filter((t) => t.paciente_id === paciente!.id && t.fecha >= hoyIso()).length >= 2) {
       return 'limite';
@@ -240,7 +240,7 @@ export async function reservarTurno(p: PedidoReserva): Promise<ResultadoReserva>
   }
   const { data, error } = await supabase.rpc('reservar_turno', {
     p_nombre: p.nombre, p_apellido: p.apellido, p_whatsapp: p.whatsapp, p_fecha: p.fecha, p_hora: p.hora,
-    p_primera_vez: p.primera_vez, p_email: p.email, p_ciudad: p.ciudad, p_edad: p.edad, p_sexo: p.sexo,
+    p_primera_vez: p.primera_vez, p_email: p.email, p_ciudad: p.ciudad, p_edad: p.edad, p_sexo: p.sexo, p_como_nos_conocio: p.como_nos_conocio,
   });
   fallar(error);
   return data as ResultadoReserva;

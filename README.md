@@ -57,10 +57,10 @@ Alternativa sin GitHub: `npx vercel` desde esta carpeta.
 
 ## Qué falta: WhatsApp real
 
-Hoy el recordatorio se **configura** (cuándo y a qué hora) y la respuesta del paciente se **simula** con los botones "Sí, confirmo" / "No puedo ir" dentro de cada turno. Para que sea real hace falta:
+Hoy el recordatorio se **configura** (cuántas horas antes de cada turno) y la respuesta del paciente se **simula** con los botones "Sí, confirmo" / "No puedo ir" dentro de cada turno. Para que sea real hace falta:
 
 - Cuenta de WhatsApp Business Platform (Meta) con una plantilla de recordatorio aprobada y botones de respuesta rápida.
-- Una tarea programada que lea `configuracion` y los turnos del día y envíe la plantilla.
+- Una tarea programada (cada 15 o 30 minutos) que lea `configuracion.recordatorio_horas_antes` y envíe la plantilla a los turnos que estén a esa cantidad de horas.
 - Un webhook que reciba la respuesta y actualice `turnos.estado`.
 
 Las dos últimas se pueden hacer con funciones de Vercel o de Supabase sin cambiar el resto de la app.

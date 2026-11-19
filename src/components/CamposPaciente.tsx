@@ -1,4 +1,4 @@
-import { SEXOS, type DatosPaciente, type Paciente } from '../types';
+import { COMO_NOS_CONOCIO, SEXOS, type DatosPaciente, type Paciente } from '../types';
 
 export interface FormPaciente {
   nombre: string;
@@ -8,13 +8,14 @@ export interface FormPaciente {
   ciudad: string;
   edad: string;
   sexo: string;
+  como_nos_conocio: string;
 }
 
-export const formVacio: FormPaciente = { nombre: '', apellido: '', whatsapp: '', email: '', ciudad: '', edad: '', sexo: '' };
+export const formVacio: FormPaciente = { nombre: '', apellido: '', whatsapp: '', email: '', ciudad: '', edad: '', sexo: '', como_nos_conocio: '' };
 
 export const formDesde = (p: Paciente): FormPaciente => ({
   nombre: p.nombre, apellido: p.apellido, whatsapp: p.whatsapp,
-  email: p.email ?? '', ciudad: p.ciudad ?? '', edad: p.edad == null ? '' : String(p.edad), sexo: p.sexo ?? '',
+  email: p.email ?? '', ciudad: p.ciudad ?? '', edad: p.edad == null ? '' : String(p.edad), sexo: p.sexo ?? '', como_nos_conocio: p.como_nos_conocio ?? '',
 });
 
 /** Valida el formulario. Devuelve los datos listos para guardar o un mensaje de error. */
@@ -28,7 +29,7 @@ export function validarPaciente(f: FormPaciente): { datos?: DatosPaciente; error
     edad = Number(f.edad);
     if (!Number.isInteger(edad) || edad < 0 || edad > 120) return { error: 'Revisá la edad.' };
   }
-  return { datos: { nombre, apellido, whatsapp, email: email || null, ciudad: f.ciudad.trim() || null, edad, sexo: f.sexo || null } };
+  return { datos: { nombre, apellido, whatsapp, email: email || null, ciudad: f.ciudad.trim() || null, edad, sexo: f.sexo || null, como_nos_conocio: f.como_nos_conocio || null } };
 }
 
 interface Props {
@@ -81,6 +82,13 @@ export function CamposPaciente({ valor, onCambio, prefijo, basico }: Props) {
             {SEXOS.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
+      </div>
+      <div className="campo">
+        <label className="etiqueta" htmlFor={`${prefijo}-como_nos_conocio`}>¿Cómo nos conociste?</label>
+        <select {...campo('como_nos_conocio')}>
+          <option value="">Elegir</option>
+          {COMO_NOS_CONOCIO.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
       </div>
       </>)}
     </div>

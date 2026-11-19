@@ -86,5 +86,16 @@ export const yaPaso = (iso: string, hora: string) => {
   return hora <= `${dos(ahora.getHours())}:${dos(ahora.getMinutes())}`;
 };
 
+/** "1 hora antes" / "24 horas antes". */
+export const horasAntes = (n: number) => (n === 1 ? '1 hora antes' : `${n} horas antes`);
+
+/** Momento en que sale un aviso N horas antes de un turno: "miércoles 18/11 a las 16:00". */
+export const momentoAntes = (iso: string, hora: string, horas: number) => {
+  const [h, m] = hora.split(':').map(Number);
+  const d = deIso(iso);
+  d.setHours(h - horas, m, 0, 0);
+  return `${diaLargo(aIso(d))} a las ${d.getHours()}:${dos(d.getMinutes())}`;
+};
+
 /** "8:00" en vez de "08:00", para mostrar. */
 export const horaLinda = (hora: string) => hora.replace(/^0/, '');

@@ -5,7 +5,7 @@ import { Modal } from './components/Modal';
 import { TurnoModal } from './components/TurnoModal';
 import { DIAS_AGENDA, MARCA } from './config';
 import * as api from './lib/datos';
-import { diaLargo, horaLinda, proximosDiasHabiles } from './lib/fechas';
+import { diaLargo, horaLinda, horasAntes, proximosDiasHabiles } from './lib/fechas';
 import { Calendario } from './screens/Calendario';
 import { General } from './screens/General';
 import { Login } from './screens/Login';
@@ -83,8 +83,7 @@ export default function App() {
 
   const turno = datos?.turnos.find((t) => t.id === turnoId) ?? null;
   const pacienteDelTurno = turno ? datos?.pacientes.find((p) => p.id === turno.paciente_id) ?? null : null;
-  const cuando = datos?.config.recordatorio_cuando === 'mismo_dia' ? 'el mismo día' : 'el día anterior';
-  const recordatorio = datos ? ` Recordatorio por WhatsApp ${cuando} a las ${datos.config.recordatorio_hora}.` : '';
+  const recordatorio = datos ? ` Recordatorio por WhatsApp ${horasAntes(datos.config.recordatorio_horas_antes)}.` : '';
   const nombreDe = (id: string) => {
     const p = datos?.pacientes.find((x) => x.id === id);
     return p ? `${p.nombre} ${p.apellido}` : 'Paciente';

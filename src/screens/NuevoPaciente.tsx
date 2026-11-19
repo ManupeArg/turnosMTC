@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { CamposPaciente, formVacio, validarPaciente, type FormPaciente } from '../components/CamposPaciente';
 import { SelectorHorario } from '../components/SelectorHorario';
 import { crearOcupado, primerLibre } from '../lib/disponibilidad';
+import { horasAntes } from '../lib/fechas';
 import type { Bloqueo, Config, DatosPaciente, Turno } from '../types';
 
 interface Props {
@@ -20,7 +21,6 @@ export function NuevoPaciente({ turnos, bloqueos, dias, config, onGuardar }: Pro
   const [hora, setHora] = useState<string | null>(() => primerLibre(ocupado, dias[0]));
   const [error, setError] = useState('');
   const [guardando, setGuardando] = useState(false);
-  const cuando = config.recordatorio_cuando === 'dia_anterior' ? 'el día anterior' : 'el mismo día';
 
   const guardar = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,7 +49,7 @@ export function NuevoPaciente({ turnos, bloqueos, dias, config, onGuardar }: Pro
         {error && <p className="error" role="alert">{error}</p>}
         <div className="formulario-pie">
           <button className="btn btn-primario btn-grande" disabled={guardando}>{conTurno ? 'Guardar paciente y turno' : 'Guardar paciente'}</button>
-          {conTurno && <span className="suave chico">El recordatorio por WhatsApp sale {cuando} a las {config.recordatorio_hora}.</span>}
+          {conTurno && <span className="suave chico">El recordatorio por WhatsApp sale {horasAntes(config.recordatorio_horas_antes)} del turno.</span>}
         </div>
       </form>
     </div>
