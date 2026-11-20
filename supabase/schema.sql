@@ -125,7 +125,7 @@ alter table public.turnos add constraint turnos_sin_superposicion exclude using 
 
 -- Recordatorios por WhatsApp.
 --   aviso1: 'dia_anterior_12' (el día anterior al mediodía) o una cantidad de horas antes ('24').
---   aviso2: '3h_1h_primeros' (3 horas antes; 1 hora antes para el 1.º y 2.º turno del día), horas antes ('2') o 'ninguno'.
+--   aviso2: '3h_1h_primeros' (3 horas antes; 1 hora antes para los turnos de 8:00 a 9:45), horas antes ('2') o 'ninguno'.
 -- (Las columnas recordatorio_* de versiones anteriores quedan sin uso.)
 alter table public.configuracion add column if not exists aviso1 text not null default 'dia_anterior_12';
 alter table public.configuracion add column if not exists aviso2 text not null default '3h_1h_primeros';

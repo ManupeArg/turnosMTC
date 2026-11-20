@@ -34,7 +34,7 @@ export function Login({ onIngreso }: { onIngreso: (email: string) => void }) {
         <p>{MARCA.matricula}</p>
         <dl className="login-datos">
           <div><dt>Dirección</dt><dd>{MARCA.direccion}</dd></div>
-          <div><dt>Atención</dt><dd>{MARCA.horarios}</dd></div>
+          <div><dt>Atención</dt><dd>{MARCA.horarios.map((h) => <span key={h} className="renglon">{h}</span>)}</dd></div>
         </dl>
       </section>
       <form className="login-form" onSubmit={enviar}>

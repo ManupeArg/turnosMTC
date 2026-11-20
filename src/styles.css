@@ -301,3 +301,15 @@ button.cal-bloqueado:hover { background: #3a3d41; }
   .salir-movil { display: block; margin-top: 8px; }
   .chip, .chips-horas .chip { min-height: 44px; }
 }
+
+.renglon { display: block; }
+
+/* Página de reserva en el celular: todo centrado y botones de elección a todo el ancho */
+@media (max-width: 640px) {
+  .reserva .tarjeta { text-align: center; }
+  .reserva .chips { justify-content: center; }
+  .reserva .chips-eleccion { display: grid; grid-template-columns: minmax(0, 1fr); }
+  .reserva .chips-eleccion .chip { min-height: 50px; font-weight: 600; }
+  .reserva .franja { align-items: stretch; }
+  .reserva input, .reserva select { text-align: center; }
+}

@@ -49,7 +49,7 @@ export interface NoDisponible {
 export interface Config {
   /** Recordatorio 1: 'dia_anterior_12' (el día anterior al mediodía) o una cantidad de horas antes ('24'). */
   aviso1: string;
-  /** Recordatorio 2: '3h_1h_primeros' (3 horas antes; 1 hora antes para el 1.º y 2.º turno del día),
+  /** Recordatorio 2: '3h_1h_primeros' (3 horas antes; 1 hora antes para los turnos de 8:00 a 9:45),
    *  una cantidad de horas antes ('2') o 'ninguno'. */
   aviso2: string;
 }

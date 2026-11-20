@@ -1,12 +1,13 @@
 // Datos del consultorio y reglas de la agenda. Cambiá acá y se actualiza toda la app.
 
 export const MARCA = {
-  consultorio: 'Centro Quiropráctico SGO',
+  consultorio: 'Centro Quiropráctico Santiago',
   profesional: 'Lic. Dante Omar Gimenez',
   titulos: 'Lic. en Kinesiología · Quiropráctico',
   matricula: 'M.P. 084',
-  direccion: 'Catamarca 312',
-  horarios: 'Lunes a viernes de 8 a 12 y de 16 a 20 hs. Jueves solo por la tarde.',
+  direccion: 'Catamarca 312, Sgo. del Estero',
+  /** Cada elemento se muestra en un renglón. */
+  horarios: ['Lunes a viernes de 8 a 12 y de 16 a 20 hs.', 'Jueves de 16 a 20 hs.'],
   /** WhatsApp del consultorio, solo números con código de país (ej: '5493851234567').
    *  Vacío = el botón abre WhatsApp sin destinatario, para simular. */
   whatsapp: '',

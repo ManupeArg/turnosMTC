@@ -94,7 +94,7 @@ export function Reservar() {
 
             <div className="campo">
               <span className="etiqueta">¿Es tu primera vez en el consultorio?</span>
-              <div className="chips">
+              <div className="chips chips-eleccion">
                 <button type="button" aria-pressed={primeraVez === true} className={`chip ${primeraVez === true ? 'chip-activo' : ''}`} onClick={() => setPrimeraVez(true)}>Sí, es mi primera vez</button>
                 <button type="button" aria-pressed={primeraVez === false} className={`chip ${primeraVez === false ? 'chip-activo' : ''}`} onClick={() => setPrimeraVez(false)}>No, ya soy paciente</button>
               </div>
@@ -123,7 +123,7 @@ export function Reservar() {
           </form>
         )}
         <a className="btn btn-borde btn-link btn-whatsapp" href={consulta} target="_blank" rel="noreferrer">¿Dudas? Escribinos por WhatsApp</a>
-        <p className="suave chico reserva-pie">{MARCA.horarios}</p>
+        <p className="suave chico reserva-pie">{MARCA.horarios.map((h) => <span key={h} className="renglon">{h}</span>)}</p>
       </main>
     </div>
   );
