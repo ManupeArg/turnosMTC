@@ -99,7 +99,7 @@ La agenda va en bloques de 15 minutos. Un turno de primera vez dura 30 minutos y
 ## Recordatorios predeterminados
 
 - Recordatorio 1: el día anterior al mediodía.
-- Recordatorio 2: 3 horas antes del turno; para el primer y el segundo turno del día (los dos más tempranos cargados ese día), 1 hora antes.
+- Recordatorio 2: 3 horas antes del turno; para los turnos de 8:00 a 9:45, 1 hora antes (`HORA_LIMITE_TEMPRANOS` en `src/lib/avisos.ts`).
 
 Los dos se pueden cambiar en General por una cantidad fija de horas. Si un turno se reserva después del momento en que debía salir un recordatorio, ese recordatorio no se envía. Las reglas están en `src/lib/avisos.ts`.
 
